@@ -1,5 +1,9 @@
 import streamlit as st
+import os
 from nsfw import NsfwNovelWriter
+
+if st.secrets.get("OPENAI_API_KEY"):
+    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
 st.title("NSFW 小说生成器")
 st.markdown("""
