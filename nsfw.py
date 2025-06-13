@@ -35,7 +35,7 @@ class NsfwNovelWriter:
 
     def design_overall(self, requirements: str):
         """
-        生成小说概要（由LLM推断语言或用户指定）。
+        生成小说概要（由LLM推断语言或用户指定），并直接生成角色列表。
         """
         prompt = f'''
           You are a professional NSFW novel writer.
@@ -43,11 +43,13 @@ class NsfwNovelWriter:
 
           Design an overall plot for a NSFW novel based on the following requirements: {requirements}
           The design should include a title and a brief overview of the plot, both in the determined language.
+          Then, based on the title and overview, design a list of main characters for the NSFW novel. For each character, return a single string that contains the name and all other descriptions, merged together.
           You should return a JSON object with the following structure:
           {{
               "title": "The title of the NSFW novel",
               "overview": "A brief overview of the NSFW novel's plot",
-              "language": "The language of the NSFW novel"
+              "language": "The language of the NSFW novel",
+              "characters": ["角色名：描述...", ...]
           }}
         '''
         llm = self.model.with_structured_output(NSFWOverallDesign)
@@ -56,23 +58,7 @@ class NsfwNovelWriter:
         self.state.title = result.title
         self.state.overview = result.overview
         self.state.language = result.language
-
-    def design_characters(self):
-        """
-        根据小说标题和概要生成角色字符串列表，并更新state.characters。
-        """
-        prompt = f'''
-          You are a professional NSFW novel writer.
-          Language: {self.state.language}
-          Based on the following title and overview, design a list of main characters for the NSFW novel. For each character, return a single string that contains the name and all other descriptions, merged together.
-          Title: {self.state.title}
-          Overview: {self.state.overview}
-          You should return a JSON array of strings, each string like:
-          "角色名：描述..."
-        '''
-        llm = self.model.with_structured_output(ListModel[str])
-        result = llm.invoke(prompt)
-        self.state.characters = result.root
+        self.state.characters = result.characters
 
     def design_chapters(self):
         """

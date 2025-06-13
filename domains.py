@@ -43,6 +43,7 @@ class NSFWOverallDesign(BaseModel):
     title: str | None = Field(default=None, description="The title of the NSFW novel.")
     overview: str | None = Field(default=None, description="A brief overview of the NSFW novel's plot.")  
     language: str | None = Field(default=None, description="The language of the NSFW novel.")
+    characters: list[str] = Field(default_factory=list, description="A list of main characters, each as a string with name和描述合并.")
     
 class NSFWNovel(BaseModel):
     requirements: str | None = Field(default=None, description="The requirements for the NSFW novel.")

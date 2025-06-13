@@ -52,43 +52,21 @@ if state.title is not None:
     overall = st.text_area("小说概要：", value=state.overview or "", key="overview_input")
     state.title = title
     state.overview = overall
-    
-    if st.button("生成角色列表"):
-        if state.title and state.overview:
-            writer.design_characters()
-            st.success("角色列表生成成功！")
-        else:
-            st.warning("请先生成小说概要（标题和概要）后再生成角色列表。")
 
-    # 角色编辑、增加、删除
-    if state.title is not None:
-        st.subheader("角色列表：")
-        # 编辑和删除
-        new_characters = []
-        for idx, character in enumerate(state.characters):
-            col1, col2 = st.columns([8, 1])
-            with col1:
-                edited = st.text_input(f"角色{idx+1}", value=character, key=f"character_{idx}")
-            with col2:
-                remove = st.button("删除", key=f"remove_character_{idx}")
-            if not remove:
-                new_characters.append(edited)
-        # 增加角色
-        new_char = st.text_input("新增角色", value="", key="add_character")
-        add_char_clicked = st.button("添加角色")
-        # 立即响应删除和添加
-        if add_char_clicked and new_char.strip():
-            new_characters.append(new_char.strip())
-        if new_characters != state.characters:
-            state.characters = new_characters
-            st.success("角色列表已更新！")
+    # 角色列表直接由state.characters渲染，无需单独生成按钮
+    def rerender():
+        st.experimental_rerun()
 
-    if st.button("生成章节概要"):
+    # 章节生成按钮逻辑不变
+    if st.button('生成章节概要'):
         if state.title and state.overview and state.language and state.characters:
             writer.design_chapters()
-            st.success("章节概要生成成功！")
+            for chapter in state.chapters:
+                chapter.sections.clear()
+            st.success('章节概要生成成功！')
+            rerender()
         else:
-            st.warning("请先生成小说概要、角色列表后再生成章节概要。")
+            st.warning('请先生成小说概要后再生成章节概要。')
 
     # 展示章节概要及其sections编辑与生成
     if state.chapters:
