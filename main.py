@@ -95,15 +95,15 @@ if state.title is not None:
         tabs = st.tabs(tab_titles)
         for idx, (chapter, tab) in enumerate(zip(state.chapters, tabs)):
             with tab:
-                title = chapter.title or f"章节{idx+1}"
-                overview = chapter.overview or ""
-                st.markdown(f"**{title}**\n\n{overview}")
-
+                # 章节标题和概要可编辑
+                chapter_title = st.text_input(f"章节{idx+1}标题", value=chapter.title or f"章节{idx+1}", key=f"chapter_title_{idx}")
+                chapter_overview = st.text_area(f"章节{idx+1}概要", value=chapter.overview or "", key=f"chapter_overview_{idx}")
+                chapter.title = chapter_title
+                chapter.overview = chapter_overview
                 # 生成sections按钮
                 if st.button(f"为本章节生成小节", key=f"gen_sections_{idx}"):
                     writer.design_sections(idx)
-                    st.success(f"已为{title}生成小节！")
-
+                    st.success(f"已为{chapter_title}生成小节！")
                 # 展示并可编辑sections
                 if chapter.sections:
                     st.markdown("**小节列表：**")

@@ -108,7 +108,9 @@ with ui.row().classes('w-full justify-center'):
                         with ui.tab_panels(tabs, value=tab_titles[0]).classes('w-full') as panels:
                             for idx, chapter in enumerate(state.chapters):
                                 with ui.tab_panel(tab_titles[idx]):
-                                    ui.markdown(f'**{chapter.title or f"章节{idx+1}"}**\n\n{chapter.overview or ""}').classes('text-center')
+                                    # 章节标题和概要可编辑
+                                    ui.input(f'章节{idx+1}标题').classes('w-full mb-2').bind_value(chapter, 'title')
+                                    ui.textarea(f'章节{idx+1}概要').classes('w-full mb-2').bind_value(chapter, 'overview')
                                     with ui.row().classes('justify-center'):
                                         btn_sec = ui.button('为本章节生成小节').classes('mb-2')
                                         btn_sec.on('click', lambda e, idx=idx, chapter=chapter, btn=btn_sec: update_sections(idx, chapter, btn_sec))
