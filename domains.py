@@ -52,6 +52,7 @@ class NSFWNovel(BaseModel):
     language: str | None = Field(default=None, description="The language of the NSFW novel.")
     characters: list[str] = Field(default_factory=list, description="A list of NSFW characters in the novel.")
     chapters: list[NSFWChapter] = Field(default_factory=list, description="A list of NSFW chapters in the novel.")
+    exported_markdown: str | None = Field(default=None, description="The exported markdown of the novel.")
 
 
 class ListModel[T](RootModel[T]):

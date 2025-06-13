@@ -1,8 +1,10 @@
 import streamlit as st
 import os
+import json
 from nsfw import NsfwNovelWriter
+from domains import NSFWNovel
 
-if st.secrets.get("OPENAI_API_KEY"):
+if not os.environ["OPENAI_API_KEY"]:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
 st.title("NSFW 小说生成器")
@@ -46,6 +48,34 @@ if st.button("生成小说概要"):
     else:
         st.warning("请输入需求后再生成。")
 
+# 重置按钮
+if st.button("重置"):
+    st.session_state['writer'] = NsfwNovelWriter()
+    st.success("已重置所有内容！")
+    st.rerun()
+
+# 导出/导入state
+col_export, col_import = st.columns(2)
+with col_export:
+    if st.button("导出为JSON"):
+        st.download_button(
+            label="下载JSON",
+            data=json.dumps(state.model_dump(), ensure_ascii=False, indent=2),
+            file_name=f"{state.title or 'NSFW小说'}.json",
+            mime="application/json"
+        )
+with col_import:
+    uploaded = st.file_uploader("从JSON导入", type=["json"])
+    if uploaded is not None:
+        try:
+            data = json.load(uploaded)
+            st.session_state['writer'] = NsfwNovelWriter()
+            st.session_state['writer'].state = NSFWNovel.model_validate(data)
+            st.success("导入成功！")
+            st.rerun()
+        except Exception as e:
+            st.error(f"导入失败: {e}")
+
 # 标题和概要编辑
 if state.title is not None:
     title = st.text_input("小说标题：", value=state.title or "", key="title_input")
@@ -87,6 +117,15 @@ if state.title is not None:
             rerender()
         else:
             st.warning('请先生成小说概要后再生成章节概要。')
+
+    # 导出markdown按钮
+    if not hasattr(state, 'exported_markdown'):
+        state.exported_markdown = None
+    if st.button('生成导出文件'):
+        writer.export_markdown()
+        st.success('已生成导出文件！')
+    if state.exported_markdown:
+        st.download_button('下载导出Markdown', data=state.exported_markdown, file_name=f"{state.title or 'NSFW小说'}.md", mime='text/markdown')
 
     # 展示章节概要及其sections编辑与生成
     if state.chapters:

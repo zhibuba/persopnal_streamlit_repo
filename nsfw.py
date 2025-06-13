@@ -24,9 +24,10 @@ class LLMLoggingCallbackHandler(BaseCallbackHandler):
     def on_llm_error(self, *args, **kwargs):
         logging.error(f"LLM error with args: {args}, kwargs: {kwargs}")
     
-model = ChatOpenAI(model="deepseek/deepseek-chat-v3-0324",
+model = ChatOpenAI(model="google/gemini-2.5-flash-preview-05-20",
     base_url="https://openrouter.ai/api/v1",
-    callbacks=[LLMLoggingCallbackHandler("llm_log.txt")],)
+    callbacks=[LLMLoggingCallbackHandler("llm_log.txt")],
+    model_kwargs={})
 
 json_method = 'json_mode'
 
@@ -74,7 +75,8 @@ class NsfwNovelWriter:
           Characters: {self.state.characters}
           
           Based on the above information, design a summary and a list of main plots/chapters for the NSFW novel. Each plot should have a title and a brief overview, all in the specified language.
-          You should return a JSON object with the following structure:
+          You should return a JSON object with the following structure without any additional fields:
+          ```json
             [
                 {{
                     "title": "The title of the chapter 1",
@@ -84,7 +86,8 @@ class NsfwNovelWriter:
                     "title": "The title of the chapter 2",
                     "overview": "A brief overview of the chapter2"
                 }},
-              ]
+            ]
+            ```
         '''
         llm = self.model.with_structured_output(ListModel[NSFWPlot], method=json_method)
         result: ListModel[NSFWPlot] = llm.invoke(prompt)
@@ -150,3 +153,53 @@ class NsfwNovelWriter:
         llm = self.model
         result = llm.invoke(prompt).content
         section.content = result
+
+    def export_markdown(self) -> str:
+        """
+        导出当前 state 为完整小说的 markdown 文本，结构分明，适合阅读，并自动生成目录。
+        并将结果写入 self.state.exported_markdown。
+        """
+        lines = []
+        # 标题
+        if self.state.title:
+            lines.append(f"# {self.state.title}\n")
+        # 概要
+        if self.state.overview:
+            lines.append(f"**小说概要：**\n{self.state.overview}\n")
+        # 目录
+        toc = []
+        if self.state.characters:
+            toc.append(f"- [角色列表](#角色列表)")
+        for cidx, chapter in enumerate(self.state.chapters):
+            chapter_title = chapter.title or f"章节{cidx+1}"
+            anchor = chapter_title.replace(' ', '').replace('#', '')
+            toc.append(f"- [{chapter_title}](#{anchor})")
+            for sidx, section in enumerate(chapter.sections):
+                section_title = section.title or f"小节{sidx+1}"
+                section_anchor = section_title.replace(' ', '').replace('#', '')
+                toc.append(f"    - [{section_title}](#{section_anchor})")
+        if toc:
+            lines.append("## 目录\n" + "\n".join(toc) + "\n")
+        # 角色
+        if self.state.characters:
+            lines.append("## 角色列表\n")
+            for idx, char in enumerate(self.state.characters):
+                lines.append(f"- {char}")
+            lines.append("")
+        # 章节
+        for cidx, chapter in enumerate(self.state.chapters):
+            chapter_title = chapter.title or f"章节{cidx+1}"
+            lines.append(f"## {chapter_title}\n")
+            if chapter.overview:
+                lines.append(f"> {chapter.overview}\n")
+            # 小节
+            for sidx, section in enumerate(chapter.sections):
+                section_title = section.title or f"小节{sidx+1}"
+                lines.append(f"### {section_title}\n")
+                if section.overview:
+                    lines.append(f"> {section.overview}\n")
+                if section.content:
+                    lines.append(section.content.strip() + "\n")
+        md = "\n".join(lines)
+        self.state.exported_markdown = md
+        return md
