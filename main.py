@@ -52,10 +52,30 @@ if state.title is not None:
     overall = st.text_area("小说概要：", value=state.overview or "", key="overview_input")
     state.title = title
     state.overview = overall
+    st.subheader("角色列表：")
+        # 编辑和删除
+    new_characters = []
+    for idx, character in enumerate(state.characters):
+        col1, col2 = st.columns([8, 1])
+        with col1:
+            edited = st.text_input(f"角色{idx+1}", value=character, key=f"character_{idx}")
+        with col2:
+            remove = st.button("删除", key=f"remove_character_{idx}")
+        if not remove:
+            new_characters.append(edited)
+    # 增加角色
+    new_char = st.text_input("新增角色", value="", key="add_character")
+    add_char_clicked = st.button("添加角色")
+    # 立即响应删除和添加
+    if add_char_clicked and new_char.strip():
+        new_characters.append(new_char.strip())
+    if new_characters != state.characters:
+        state.characters = new_characters
+        st.success("角色列表已更新！")
 
     # 角色列表直接由state.characters渲染，无需单独生成按钮
     def rerender():
-        st.experimental_rerun()
+        st.rerun()
 
     # 章节生成按钮逻辑不变
     if st.button('生成章节概要'):
