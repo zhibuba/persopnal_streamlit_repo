@@ -28,6 +28,8 @@ model = ChatOpenAI(model="deepseek/deepseek-chat-v3-0324",
     base_url="https://openrouter.ai/api/v1",
     callbacks=[LLMLoggingCallbackHandler("llm_log.txt")],)
 
+json_method = 'json_mode'
+
 class NsfwNovelWriter:
     def __init__(self):
         self.model = model
@@ -52,7 +54,7 @@ class NsfwNovelWriter:
               "characters": ["角色名：描述...", ...]
           }}
         '''
-        llm = self.model.with_structured_output(NSFWOverallDesign)
+        llm = self.model.with_structured_output(NSFWOverallDesign, method=json_method)
         result: NSFWOverallDesign = llm.invoke(prompt)
         self.state.requirements = requirements
         self.state.title = result.title
@@ -84,7 +86,7 @@ class NsfwNovelWriter:
                 }},
               ]
         '''
-        llm = self.model.with_structured_output(ListModel[NSFWPlot])
+        llm = self.model.with_structured_output(ListModel[NSFWPlot], method=json_method)
         result: ListModel[NSFWPlot] = llm.invoke(prompt)
         # 将返回的plots写入state.chapters
         self.state.chapters = [NSFWChapter(title=plot.title, overview=plot.overview, sections=[]) for plot in result.root]
@@ -112,7 +114,7 @@ class NsfwNovelWriter:
               "overview": "A brief description of the section's plot"
           }}
         '''
-        llm = self.model.with_structured_output(ListModel[NSFWPlot])
+        llm = self.model.with_structured_output(ListModel[NSFWPlot], method=json_method)
         result = llm.invoke(prompt)
         self.state.chapters[chapter_index].sections = [
             NSFWSection(title=section.title, overview=section.overview, content=None)
