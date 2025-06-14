@@ -1,6 +1,11 @@
 from pydantic import BaseModel, Field, RootModel
 
 
+class NSFWCharacter(BaseModel):
+    name: str = Field(..., description="角色名")
+    description: str = Field(..., description="角色描述")
+
+
 class NSFWPlot(BaseModel):
     title: str | None = Field(default=None, description="The title of the plot.")
     overview: str | None = Field(default=None, description="A brief overview of the plot.")
@@ -43,16 +48,17 @@ class NSFWOverallDesign(BaseModel):
     title: str | None = Field(default=None, description="The title of the NSFW novel.")
     overview: str | None = Field(default=None, description="A brief overview of the NSFW novel's plot.")  
     language: str | None = Field(default=None, description="The language of the NSFW novel.")
-    characters: list[str] = Field(default_factory=list, description="A list of main characters, each as a string with name和描述合并.")
+    characters: list[NSFWCharacter] = Field(default_factory=list, description="A list of main characters, each as an object with name and description.")
     
 class NSFWNovel(BaseModel):
     requirements: str | None = Field(default=None, description="The requirements for the NSFW novel.")
     title: str | None = Field(default=None, description="The title of the NSFW novel.")
     overview: str | None = Field(default=None, description="A brief overview of the NSFW novel's plot.")
     language: str | None = Field(default=None, description="The language of the NSFW novel.")
-    characters: list[str] = Field(default_factory=list, description="A list of NSFW characters in the novel.")
+    characters: list[NSFWCharacter] = Field(default_factory=list, description="A list of NSFW characters in the novel.")
     chapters: list[NSFWChapter] = Field(default_factory=list, description="A list of NSFW chapters in the novel.")
     exported_markdown: str | None = Field(default=None, description="The exported markdown of the novel.")
+    current_state: dict = Field(default_factory=dict, description="Current state for each character, to be incrementally updated by LLM. Format: {character_name: {state_info}}.")
 
 
 class ListModel[T](RootModel[T]):
@@ -67,3 +73,7 @@ class ListModel[T](RootModel[T]):
 
     def __len__(self):
         return len(self.root)
+
+class SectionContentResponse(BaseModel):
+    content: str = Field(..., description="The generated content for the section.")
+    current_state: dict = Field(..., description="The updated state for each character after this section.")

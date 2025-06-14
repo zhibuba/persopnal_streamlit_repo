@@ -4,16 +4,15 @@ import logging
 dotenv.load_dotenv()
 
 from langchain_openai import ChatOpenAI
+from langchain.globals import set_debug, set_verbose
 from langchain_core.callbacks.base import BaseCallbackHandler
 
 from domains import *
 
 # 配置logging
-logging.basicConfig(filename="llm_log.txt", level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s', encoding='utf-8')
+logging.basicConfig(filename="nsfw.log", level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s', encoding='utf-8')
 
-class LLMLoggingCallbackHandler(BaseCallbackHandler):
-    def __init__(self, log_file: str):
-        self.log_file = log_file  # 保留但不直接用
+class LLMLoggingCallbackHandler(BaseCallbackHandler): 
 
     def on_llm_start(self, *args, **kwargs):
         logging.info(f"LLM started with args: {args}, kwargs: {kwargs}")
@@ -26,10 +25,21 @@ class LLMLoggingCallbackHandler(BaseCallbackHandler):
     
 model = ChatOpenAI(model="google/gemini-2.5-flash-preview-05-20",
     base_url="https://openrouter.ai/api/v1",
-    callbacks=[LLMLoggingCallbackHandler("llm_log.txt")],
-    model_kwargs={})
+    callbacks=[LLMLoggingCallbackHandler()],
+    model_kwargs={
+        "extra_body": {"safety_settings": [
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        ]
+        }
+    })
 
 json_method = 'json_mode'
+
+set_verbose(True)
+set_debug(True)
 
 class NsfwNovelWriter:
     def __init__(self):
@@ -46,13 +56,13 @@ class NsfwNovelWriter:
 
           Design an overall plot for a NSFW novel based on the following requirements: {requirements}
           The design should include a title and a brief overview of the plot, both in the determined language.
-          Then, based on the title and overview, design a list of main characters for the NSFW novel. For each character, return a single string that contains the name and all other descriptions, merged together.
+          Then, based on the title and overview, design a list of main characters for the NSFW novel. For each character, return an object with name and description fields.
           You should return a JSON object with the following structure:
           {{
               "title": "The title of the NSFW novel",
               "overview": "A brief overview of the NSFW novel's plot",
               "language": "The language of the NSFW novel",
-              "characters": ["角色名：描述...", ...]
+              "characters": [{{"name": "角色名", "description": "描述..."}}, ...]
           }}
         '''
         llm = self.model.with_structured_output(NSFWOverallDesign, method=json_method)
@@ -62,6 +72,8 @@ class NsfwNovelWriter:
         self.state.overview = result.overview
         self.state.language = result.language
         self.state.characters = result.characters
+        # 初始化各角色状态
+        self.state.current_state = {c.name: "(Initial State)" for c in result.characters}
 
     def design_chapters(self):
         """
@@ -72,7 +84,7 @@ class NsfwNovelWriter:
           Language: {self.state.language}
           Title: {self.state.title}
           Overview: {self.state.overview}
-          Characters: {self.state.characters}
+          Characters: {[{"name": c.name, "description": c.description} for c in self.state.characters]}
           
           Based on the above information, design a summary and a list of main plots/chapters for the NSFW novel. Each plot should have a title and a brief overview, all in the specified language.
           You should return a JSON object with the following structure without any additional fields:
@@ -108,7 +120,7 @@ class NsfwNovelWriter:
           Overview: {self.state.overview}
           Chapter Title: {chapter.title}
           Chapter Overview: {chapter.overview}
-          Characters: {self.state.characters}
+          Characters: {[{"name": c.name, "description": c.description} for c in self.state.characters]}
           
           Based on the above information, design a list of sections for this chapter. Each section should have a title and a brief overview, all in the specified language.
           You should return a JSON array of objects, each like:
@@ -124,35 +136,72 @@ class NsfwNovelWriter:
             for section in result.root
         ]
 
-    def write_section_content(self, chapter_index: int, section_index: int):
+    def write_section_content(self, chapter_index: int, section_index: int) -> SectionContentResponse:
         """
-        为指定章节和小节生成正文内容，并写入state.chapters[chapter_index].sections[section_index].content。
-        上一小节正文（如有）也会放入prompt。
+        Generate the content for the specified chapter and section, and return a SectionContentResponse.
+        If this is the first section of the chapter and there is a previous chapter, pass the last section content of the previous chapter as context.
+        The prompt uses markdown structure, and all instructions are in English. The current chapter and section overview are included in the final instruction paragraph.
+        LLM should return a JSON object: {"content": "...", "current_state": {character_name: {state_info}}}
         """
         chapter = self.state.chapters[chapter_index]
         section = chapter.sections[section_index]
         prev_content = None
         if section_index > 0:
             prev_content = chapter.sections[section_index - 1].content
+        elif chapter_index > 0 and self.state.chapters[chapter_index - 1].sections:
+            prev_chapter = self.state.chapters[chapter_index - 1]
+            prev_content = prev_chapter.sections[-1].content
+        all_chapter_summaries = self._get_chapter_summaries()
+        all_section_summaries = self._get_section_summaries(chapter)
+        character_md = self._get_character_md()
+        current_state_str = str(self.state.current_state) if self.state.current_state else '{}'
         prompt = f'''
-          You are a professional NSFW novel writer.
-          Language: {self.state.language}
-          Title: {self.state.title}
-          Overview: {self.state.overview}
-          Chapter Title: {chapter.title}
-          Chapter Overview: {chapter.overview}
-          Section Title: {section.title}
-          Section Overview: {section.overview}
-          Characters: {self.state.characters}
-          {'Previous Section Content: ' + prev_content if prev_content else ''}
+# NSFW Novel Writing Task
 
-          Based on the above information, write the full content for this section in the specified language.
-          Make the content as erotic, logical, and interesting as possible.
-          You should return a string as the content.
-        '''
+## Book Title
+{self.state.title}
+
+## Book Overview
+{self.state.overview}
+
+## All Chapter Summaries
+{all_chapter_summaries}
+
+## Characters
+{character_md}
+
+## All Section Summaries in Current Chapter
+{all_section_summaries}
+
+## Current Character States (for incremental update)
+{current_state_str}
+
+{'**Previous Section Content:**\n' + prev_content if prev_content else ''}
+
+---
+
+Write the full content for the current section only (do not include section or chapter titles). The language must be {self.state.language}. Make the content as erotic, logical, and interesting as possible.\n\nCurrent chapter overview: {chapter.overview}\nCurrent section overview: {section.overview}\n\nAfter the content, return a JSON object with two fields: content (the section content as a string) and current_state (the updated state for each character, as a dict, incrementally updated based on this section).
+'''
         llm = self.model
-        result = llm.invoke(prompt).content
-        section.content = result
+        result = llm.with_structured_output(SectionContentResponse).invoke(prompt)
+        section.content = result.content
+        self.state.current_state = result.current_state
+        return result
+
+    def _get_chapter_summaries(self):
+        return "\n".join([
+            f"- **{idx+1}. {c.title or f'Chapter {idx+1}'}**: {c.overview or ''}" for idx, c in enumerate(self.state.chapters)
+        ])
+
+    def _get_section_summaries(self, chapter):
+        return "\n".join([
+            f"    - **{sidx+1}. {s.title or f'Section {sidx+1}'}**: {s.overview or ''}" for sidx, s in enumerate(chapter.sections)
+        ])
+
+    def _get_character_md(self):
+        return "\n".join([
+            f"- **{c.name}**: {c.description}" for c in self.state.characters
+        ])
 
     def export_markdown(self) -> str:
         """
@@ -183,8 +232,7 @@ class NsfwNovelWriter:
         # 角色
         if self.state.characters:
             lines.append("## 角色列表\n")
-            for idx, char in enumerate(self.state.characters):
-                lines.append(f"- {char}")
+            lines.append(self._get_character_md())
             lines.append("")
         # 章节
         for cidx, chapter in enumerate(self.state.chapters):

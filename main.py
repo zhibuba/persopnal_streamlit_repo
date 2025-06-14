@@ -83,25 +83,31 @@ if state.title is not None:
     state.title = title
     state.overview = overall
     st.subheader("角色列表：")
-        # 编辑和删除
+    # 编辑和删除
     new_characters = []
     for idx, character in enumerate(state.characters):
-        col1, col2 = st.columns([8, 1])
+        col1, col2, col3 = st.columns([4, 8, 2])
         with col1:
-            edited = st.text_input(f"角色{idx+1}", value=character, key=f"character_{idx}")
+            edited_name = st.text_input(f"角色名{idx+1}", value=character.name, key=f"character_name_{idx}")
         with col2:
+            edited_desc = st.text_input(f"角色描述{idx+1}", value=character.description, key=f"character_desc_{idx}")
+        with col3:
             remove = st.button("删除", key=f"remove_character_{idx}")
         if not remove:
-            new_characters.append(edited)
-    # 增加角色
-    new_char = st.text_input("新增角色", value="", key="add_character")
-    add_char_clicked = st.button("添加角色")
-    # 立即响应删除和添加
-    if add_char_clicked and new_char.strip():
-        new_characters.append(new_char.strip())
-    if new_characters != state.characters:
-        state.characters = new_characters
-        st.success("角色列表已更新！")
+            from domains import NSFWCharacter
+            new_characters.append(NSFWCharacter(name=edited_name, description=edited_desc))
+    # 增加角色（放到同一行）
+    coln1, coln2, coln3 = st.columns([4, 8, 2])
+    with coln1:
+        new_char_name = st.text_input("新增角色名", value="", key="add_character_name")
+    with coln2:
+        new_char_desc = st.text_input("新增角色描述", value="", key="add_character_desc")
+    with coln3:
+        add_char_clicked = st.button("添加角色")
+    if add_char_clicked and new_char_name.strip():
+        from domains import NSFWCharacter
+        new_characters.append(NSFWCharacter(name=new_char_name, description=new_char_desc))
+    state.characters = new_characters
 
     # 角色列表直接由state.characters渲染，无需单独生成按钮
     def rerender():
@@ -158,7 +164,7 @@ if state.title is not None:
                             f"章节{idx+1}小节{sidx+1}内容",
                             value=section.content or "",
                             key=f"section_content_{idx}_{sidx}",
-                            height=None  # 自适应高度
+                            height=400  # 设置较大的默认高度
                         )
                         # 写回state
                         section.title = sec_title
