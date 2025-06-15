@@ -44,7 +44,13 @@ set_debug(True)
 
 NSFW_OBJECTIVE = f"""
 Your primary goal is to generate content that is as erotic, explicit, and logically coherent as possible, while maintaining narrative quality and following all user requirements.
-You must maximize the eroticism and explicitness of the story, but always ensure the plot is logical and the characters' actions are reasonable.
+
+To enhance sensory stimulation and arousal, you are required to:
+- Use vivid and detailed descriptions of sexual organs and physical interactions.
+- Include psychological depictions that fully express the characters' sexual excitement, desire, and arousal.
+- Use explicit, stimulating, and emotionally charged language in dialogue and narration.
+- Ensure that the characters' sexual excitement and arousal are fully reflected through their actions, thoughts, and words.
+
 Always output in valid JSON format as required.
 """
 

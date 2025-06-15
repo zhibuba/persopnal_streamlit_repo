@@ -139,12 +139,32 @@ if state.title is not None:
             else:
                 st.warning('请先生成小说概要后再生成章概要。')
 
+    # 章概要及其节编辑前，显示并可编辑各角色当前状态
+    if state.current_state:
+        st.markdown("### 角色当前状态")
+        new_current_state = {}
+        for char in state.characters:
+            char_name = char.name
+            char_state = state.current_state.get(char_name, "")
+            new_state = st.text_area(f"{char_name} 当前状态", value=char_state, key=f"current_state_{char_name}")
+            new_current_state[char_name] = new_state
+        state.current_state = new_current_state
+
     # 展示章概要及其节编辑与生成
     if state.chapters:
+        # 新增章按钮
+        if st.button("新增章"):
+            from domains import NSFWChapter
+            state.chapters.append(NSFWChapter(title="", overview="", sections=[]))
+            rerender()
         tab_titles = [chapter.title or f"章{idx+1}" for idx, chapter in enumerate(state.chapters)]
         tabs = st.tabs(tab_titles)
+        chapters_to_delete = []
         for idx, (chapter, tab) in enumerate(zip(state.chapters, tabs)):
             with tab:
+                # 删除本章按钮
+                if st.button(f"删除本章", key=f"delete_chapter_{idx}"):
+                    chapters_to_delete.append(idx)
                 # 章标题和概要可编辑
                 chapter_title = st.text_input(f"章{idx+1}标题", value=chapter.title or f"章{idx+1}", key=f"chapter_title_{idx}")
                 chapter_overview = st.text_area(f"章{idx+1}概要", value=chapter.overview or "", key=f"chapter_overview_{idx}")
@@ -161,22 +181,43 @@ if state.title is not None:
                 # 展示并可编辑sections
                 if chapter.sections:
                     st.markdown("**节列表：**")
+                    sections_to_delete = []
                     for sidx, section in enumerate(chapter.sections):
-                        sec_title = st.text_input(f"章{idx+1}节{sidx+1}标题", value=section.title or "", key=f"section_title_{idx}_{sidx}")
-                        sec_overview = st.text_area(f"章{idx+1}节{sidx+1}概要", value=section.overview or "", key=f"section_overview_{idx}_{sidx}")
+                        col_secA, col_secB, col_secC = st.columns([4, 8, 2])
+                        with col_secA:
+                            sec_title = st.text_input(f"章{idx+1}节{sidx+1}标题", value=section.title or "", key=f"section_title_{idx}_{sidx}")
+                        with col_secB:
+                            sec_overview = st.text_area(f"章{idx+1}节{sidx+1}概要", value=section.overview or "", key=f"section_overview_{idx}_{sidx}")
+                        with col_secC:
+                            if st.button(f"删除本节", key=f"delete_section_{idx}_{sidx}"):
+                                sections_to_delete.append(sidx)
                         # 生成正文按钮
                         if st.button(f"生成章{idx+1}节{sidx+1}正文", key=f"gen_content_{idx}_{sidx}"):
                             writer.write_section_content(idx, sidx)
                             st.success(f"已为章{idx+1}节{sidx+1}生成正文！")
-                        # 正文内容自适应高度
-                        sec_content = st.text_area(
-                            f"章{idx+1}节{sidx+1}内容",
-                            value=section.content or "",
-                            key=f"section_content_{idx}_{sidx}",
-                            height=400  # 设置较大的默认高度
-                        )
                         # 写回state
                         section.title = sec_title
                         section.overview = sec_overview
-                        section.content = sec_content
+                        # 正文内容自适应高度（仅当section.content不为None时显示）
+                        if section.content is not None:
+                            sec_content = st.text_area(
+                                f"章{idx+1}节{sidx+1}内容",
+                                value=section.content,
+                                key=f"section_content_{idx}_{sidx}",
+                                height=400  # 设置较大的默认高度
+                            )
+                            section.content = sec_content
+                    # 实际删除节（倒序防止索引错位）
+                    for sidx in sorted(sections_to_delete, reverse=True):
+                        del chapter.sections[sidx]
+                        rerender()
+                # 新增节按钮
+                if st.button(f"新增节", key=f"add_section_{idx}"):
+                    from domains import NSFWSection
+                    chapter.sections.append(NSFWSection(title="", overview="", content=None))
+                    rerender()
+        # 实际删除章（倒序防止索引错位）
+        for idx in sorted(chapters_to_delete, reverse=True):
+            del state.chapters[idx]
+            rerender()
 
