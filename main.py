@@ -65,13 +65,16 @@ with col_export:
             mime="application/json"
         )
 with col_import:
-    uploaded = st.file_uploader("从JSON导入", type=["json"])
+    uploaded = st.file_uploader("从JSON导入", type=["json"], key="import_json_uploader")
     if uploaded is not None:
         try:
             data = json.load(uploaded)
             st.session_state['writer'] = NsfwNovelWriter()
             st.session_state['writer'].state = NSFWNovel.model_validate(data)
             st.success("导入成功！")
+            # 清空file_uploader的session_state，防止无限rerun
+            st.session_state.pop("import_json_uploader", None)
+            
             st.rerun()
         except Exception as e:
             st.error(f"导入失败: {e}")
