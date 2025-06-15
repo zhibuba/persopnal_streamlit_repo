@@ -45,12 +45,6 @@ set_debug(True)
 NSFW_OBJECTIVE = f"""
 Your primary goal is to generate content that is as erotic, explicit, and logically coherent as possible, while maintaining narrative quality and following all user requirements.
 
-To enhance sensory stimulation and arousal, you are required to:
-- Use vivid and detailed descriptions of sexual organs and physical interactions.
-- Include psychological depictions that fully express the characters' sexual excitement, desire, and arousal.
-- Use explicit, stimulating, and emotionally charged language in dialogue and narration.
-- Ensure that the characters' sexual excitement and arousal are fully reflected through their actions, thoughts, and words.
-
 Always output in valid JSON format as required.
 """
 
@@ -92,8 +86,7 @@ Design an overall plot for a NSFW novel based on the requirements above. The des
         self.state.overview = result.overview
         self.state.language = result.language
         self.state.characters = result.characters
-        # 初始化各角色状态
-        self.state.current_state = {c.name: "(Initial State)" for c in result.characters}
+        # 初始化各角色状态（已删除 current_state）
 
     def design_chapters(self, chapter_count=None):
         """
@@ -103,13 +96,20 @@ Design an overall plot for a NSFW novel based on the requirements above. The des
         system_message = SystemMessage(content=f"""
 You are a professional NSFW novel writer.
 {NSFW_OBJECTIVE}
-You are responsible for designing the chapter structure and chapter overviews for the novel. Ensure the chapter arrangement is logical, progressive, and engaging.
+You are responsible for designing the overall chapter structure and chapter overviews for the novel.
+
+**Requirements:**
+- Each chapter overview must focus on the main storyline progression of the entire novel, outlining the key stage, major events, and global turning points for that chapter.
+- Emphasize the logical relationship and progression between chapters, ensuring each chapter builds upon the previous and sets up the next.
+- Highlight the chapter's role in the overall narrative arc, including any phase climax or major plot twist.
+- Avoid vague or fragmented summaries; provide a clear, structured framework for the novel's development.
+- Do NOT include chapter numbers or sequence indicators in the chapter titles.
 
 Return your answer in the following JSON format (in a markdown code block):
 ```json
 [
-  {{"title": "The title of the chapter 1", "overview": "A brief overview of the chapter1"}},
-  {{"title": "The title of the chapter 2", "overview": "A brief overview of the chapter2"}}
+  {{"title": "The title of the first chapter", "overview": "A brief overview of the chapter1's main plot and its role in the overall story"}},
+  {{"title": "The title of the second chapter", "overview": "A brief overview of the chapter2's main plot and its role in the overall story"}}
 ]
 ```
 """)
@@ -140,12 +140,20 @@ Based on the above information, design a summary and a list of main plots/chapte
         system_message = SystemMessage(content=f"""
 You are a professional NSFW novel writer.
 {NSFW_OBJECTIVE}
-You are responsible for designing the section structure and section overviews for the current chapter. Ensure each section is distinct, relevant, and advances the plot or character development.
+You are responsible for designing the section structure and section overviews for the current chapter.
+
+**Requirements:**
+- Each section overview must focus on the concrete plot development within this chapter, including specific events, character conflicts, emotional changes, and minor turning points.
+- Ensure each section advances the chapter's main storyline, with a clear beginning, development, climax, and resolution for that section.
+- Emphasize how each section serves the chapter's main plot and deepens character relationships or conflicts.
+- Avoid vague or generic summaries; provide actionable, detailed frameworks for subsequent writing.
+- Do NOT include section numbers or sequence indicators in the section titles.
 
 Return your answer in the following JSON format:
 ```json
 [
-  {{"title": "The title of the section", "overview": "A brief description of the section's plot"}}
+  {{"title": "The title of the first section", "overview": "A brief but concrete description of the section's plot and its function in the chapter"}},
+  {{"title": "The title of the second section", "overview": "A brief but concrete description of the section's plot and its function in the chapter"}}
 ]
 ```
 """)
@@ -172,7 +180,22 @@ Based on the above information, design a list of sections for this chapter. Each
             for section in result.root
         ]
 
-    def write_section_content(self, chapter_index: int, section_index: int) -> SectionContentResponse:
+    def _get_prev_section(self, chapter_index, section_index) -> NSFWSection | None:
+        """
+        获取上一节的section对象（如有），否则返回None。
+        """
+        if section_index > 0:
+            return self.state.chapters[chapter_index].sections[section_index - 1]
+        elif chapter_index > 0 and self.state.chapters[chapter_index - 1].sections:
+            prev_chapter = self.state.chapters[chapter_index - 1]
+            return prev_chapter.sections[-1]
+        return None
+
+    def _get_prev_after_state(self, chapter_index, section_index):
+        prev_section = self._get_prev_section(chapter_index, section_index)
+        return getattr(prev_section, 'after_state', None) if prev_section else None
+
+    def write_content(self, chapter_index: int, section_index: int) -> SectionContentResponse:
         """
         Generate the content for the specified chapter and section, and return a SectionContentResponse.
         If this is the first section of the chapter and there is a previous chapter, pass the last section content of the previous chapter as context.
@@ -181,28 +204,34 @@ Based on the above information, design a list of sections for this chapter. Each
         """
         chapter = self.state.chapters[chapter_index]
         section = chapter.sections[section_index]
-        prev_content = None
-        if section_index > 0:
-            prev_content = chapter.sections[section_index - 1].content
-        elif chapter_index > 0 and self.state.chapters[chapter_index - 1].sections:
-            prev_chapter = self.state.chapters[chapter_index - 1]
-            prev_content = prev_chapter.sections[-1].content
         all_chapter_summaries = self._get_chapter_summaries()
         all_section_summaries = self._get_section_summaries(chapter)
         character_md = self._get_character_md()
-        current_state_str = str(self.state.current_state) if self.state.current_state else '{}'
+        prev_section = self._get_prev_section(chapter_index, section_index)
+        prev_content = prev_section.content if prev_section else None
+        prev_after_state = prev_section.after_state if prev_section else None
         system_message = SystemMessage(content=f"""
 You are a professional NSFW novel writer.
 {NSFW_OBJECTIVE}
 You are writing the full content for a single section of the novel. You must update the state of each character based on the events in this section, and ensure the writing is immersive and highly erotic while remaining logical.
+
+**Dynamic Guidance:**
+- Before writing, analyze the current section’s plot function (setup, conflict, climax, resolution, etc.) and the current state of each character.
+- If the section is a buildup, transition, or conflict, focus on emotional, psychological, and relationship development. Keep erotic content and character state changes moderate and gradual.
+- If the section is a climax or major turning point, you may intensify erotic content and allow more significant state changes.
+- Always ensure the pacing of erotic content and character state progression matches the narrative needs of the current section and the overall story arc.
+
+**Characters State Updating Requirement:**
+- In the returned JSON, the `current_state` for each character must include their clothing state, psychological state, and physiological state after the events of this section.
+- For any character who does not appear or is not affected in this section, return their state as it was at the end of the previous section (or the initial state if this is the first section).
 
 Return your answer in the following JSON format:
 ```json
 {{
   "content": "<The full content of this section as a string>",
   "current_state": {{
-    "character_name1": "the state of character 1 after this section",
-    "character_name2": "the state of character 2 after this section"
+    "character_name1": {{"clothing": "...", "psychological": "...", "physiological": "..."}},
+    "character_name2": {{"clothing": "...", "psychological": "...", "physiological": "..."}}
   }}
 }}
 ```
@@ -226,7 +255,7 @@ Return your answer in the following JSON format:
 {all_section_summaries}
 
 ## Current Character States (for incremental update)
-{current_state_str}
+{prev_after_state}
 
 {'**Previous Section Content:**\n' + prev_content if prev_content else ''}
 
@@ -240,7 +269,8 @@ Write the full content for the current section only (do not include section or c
             human_message
         ])
         section.content = result.content
-        self.state.current_state = result.current_state
+        # 存储每节之后的各角色状态
+        section.after_state = {k: NSFWCharacterState(**v) if not isinstance(v, NSFWCharacterState) else v for k, v in result.current_state.items()}
         return result
 
     def _get_chapter_summaries(self):

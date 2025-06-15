@@ -34,10 +34,17 @@ class NSFWPlots(BaseModel):
         }
 
 
+class NSFWCharacterState(BaseModel):
+    clothing: str = Field(..., description="The clothing state of the character after this section.")
+    psychological: str = Field(..., description="The psychological state of the character after this section.")
+    physiological: str = Field(..., description="The physiological state of the character after this section.")
+
+
 class NSFWSection(BaseModel):
     title: str | None = Field(default=None, description="The title of the NSFW section.")
     overview: str | None = Field(default=None, description="A brief description of the NSFW section's plot.")
     content: str | None = Field(default=None, description="The content of the NSFW section.")
+    after_state: dict[str, NSFWCharacterState] = Field(default_factory=dict, description="The state for each character after this section. Format: {character_name: NSFWCharacterState}.")
     
 class NSFWChapter(BaseModel):
     title: str | None = Field(default=None, description="The title of the NSFW chapter.")
@@ -58,7 +65,6 @@ class NSFWNovel(BaseModel):
     characters: list[NSFWCharacter] = Field(default_factory=list, description="A list of NSFW characters in the novel.")
     chapters: list[NSFWChapter] = Field(default_factory=list, description="A list of NSFW chapters in the novel.")
     exported_markdown: str | None = Field(default=None, description="The exported markdown of the novel.")
-    current_state: dict = Field(default_factory=dict, description="Current state for each character, to be incrementally updated by LLM. Format: {character_name: {state_info}}.")
 
 
 class ListModel[T](RootModel[T]):
