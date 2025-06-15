@@ -76,7 +76,7 @@ Return your answer in the following JSON format:
 Requirements: {requirements}
 Design an overall plot for a NSFW novel based on the requirements above. The design should include a title and a brief overview of the plot, both in the determined language. Then, based on the title and overview, design a list of main characters for the NSFW novel. For each character, return an object with name and description fields.
 """)
-        llm = self.model.with_structured_output(NSFWOverallDesign, method=json_method)
+        llm = self.model.with_structured_output(NSFWOverallDesign, method=json_method).with_retry()
         result: NSFWOverallDesign = llm.invoke([
             system_message,
             human_message
@@ -124,7 +124,7 @@ Characters: {[{'name': c.name, 'description': c.description} for c in self.state
 {extra}
 Based on the above information, design a summary and a list of main plots/chapters for the NSFW novel. Each plot should have a title and a brief overview, all in the specified language.
 """)
-        llm = self.model.with_structured_output(ListModel[NSFWPlot], method=json_method)
+        llm = self.model.with_structured_output(ListModel[NSFWPlot], method=json_method).with_retry()
         result: ListModel[NSFWPlot] = llm.invoke([
             system_message,
             human_message
@@ -170,7 +170,7 @@ Characters: {[{'name': c.name, 'description': c.description} for c in self.state
 {extra}
 Based on the above information, design a list of sections for this chapter. Each section should have a title and a brief overview, all in the specified language.
 """)
-        llm = self.model.with_structured_output(ListModel[NSFWPlot], method=json_method)
+        llm = self.model.with_structured_output(ListModel[NSFWPlot], method=json_method).with_retry()
         result = llm.invoke([
             system_message,
             human_message
@@ -221,8 +221,16 @@ You are writing the full content for a single section of the novel. You must upd
 - If the section is a climax or major turning point, you may intensify erotic content and allow more significant state changes.
 - Always ensure the pacing of erotic content and character state progression matches the narrative needs of the current section and the overall story arc.
 
+**Content Formatting Requirements:**
+- Write the full content for the current section only (do not include section or chapter titles)
+- The content must be clearly and reasonably divided into natural paragraphs, with each paragraph separated by a blank line.
+- Do not include any special characters to divide words for censorship prevention.
+
 **Characters State Updating Requirement:**
 - In the returned JSON, the `current_state` for each character must include their clothing state, psychological state, and physiological state after the events of this section.
+- For the `clothing` field, provide a natural language description, including whether the character is naked, the specific situation of nudity, the types and state of remaining clothes, the position and integrity of clothes, and any dynamic process (e.g., being stripped, clothes torn, etc.).
+- For the `psychological` field, provide a description of the character's emotional and mental state, such as embarrassment, excitement, shame, desire, or loss of control.
+- For the `physiological` field, provide a description of the character's bodily reactions, such as blushing, rapid breathing, arousal, trembling, or other physical responses.
 - For any character who does not appear or is not affected in this section, return their state as it was at the end of the previous section (or the initial state if this is the first section).
 
 Return your answer in the following JSON format:
@@ -261,9 +269,9 @@ Return your answer in the following JSON format:
 
 ---
 
-Write the full content for the current section only (do not include section or chapter titles). The language must be {self.state.language}. Make the content as erotic, logical, and interesting as possible.\n\nCurrent chapter overview: {chapter.overview}\nCurrent section overview: {section.overview}\n.
+The language must be {self.state.language}. Make the content as erotic, logical, and interesting as possible.\n\nCurrent chapter overview: {chapter.overview}\nCurrent section overview: {section.overview}\n.
 """)
-        llm = self.model.with_structured_output(SectionContentResponse, method=json_method)
+        llm = self.model.with_structured_output(SectionContentResponse, method=json_method).with_retry()
         result = llm.invoke([
             system_message,
             human_message
