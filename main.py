@@ -78,6 +78,16 @@ with col_import:
 
 # 标题和概要编辑
 if state.title is not None:
+    # 导出markdown按钮（移动到概要之上，并同列）
+    col_md1, col_md2 = st.columns(2)
+    with col_md1:
+        if st.button('生成导出文件'):
+            writer.export_markdown()
+            st.success('已生成导出文件！')
+    with col_md2:
+        if state.exported_markdown:
+            st.download_button('下载导出Markdown', data=state.exported_markdown, file_name=f"{state.title or 'NSFW小说'}.md", mime='text/markdown')
+
     title = st.text_input("小说标题：", value=state.title or "", key="title_input")
     overall = st.text_area("小说概要：", value=state.overview or "", key="overview_input")
     state.title = title
@@ -113,55 +123,54 @@ if state.title is not None:
     def rerender():
         st.rerun()
 
-    # 章节生成按钮逻辑不变
-    if st.button('生成章节概要'):
-        if state.title and state.overview and state.language and state.characters:
-            writer.design_chapters()
-            for chapter in state.chapters:
-                chapter.sections.clear()
-            st.success('章节概要生成成功！')
-            rerender()
-        else:
-            st.warning('请先生成小说概要后再生成章节概要。')
+    # 章生成按钮逻辑不变
 
-    # 导出markdown按钮
-    if not hasattr(state, 'exported_markdown'):
-        state.exported_markdown = None
-    if st.button('生成导出文件'):
-        writer.export_markdown()
-        st.success('已生成导出文件！')
-    if state.exported_markdown:
-        st.download_button('下载导出Markdown', data=state.exported_markdown, file_name=f"{state.title or 'NSFW小说'}.md", mime='text/markdown')
+    col_ch1, col_ch2 = st.columns([2,2])
+    with col_ch1:
+        chapter_count = st.selectbox("章数量", options=["AUTO"] + [str(i) for i in range(1, 21)], index=0, key="chapter_count")
+    with col_ch2:
+        if st.button('生成章概要'):
+            if state.title and state.overview and state.language and state.characters:
+                writer.design_chapters(chapter_count=None if chapter_count=="AUTO" else int(chapter_count))
+                for chapter in state.chapters:
+                    chapter.sections.clear()
+                st.success('章概要生成成功！')
+                rerender()
+            else:
+                st.warning('请先生成小说概要后再生成章概要。')
 
-    # 展示章节概要及其sections编辑与生成
+    # 展示章概要及其节编辑与生成
     if state.chapters:
-        st.subheader("章节概要：")
-        tab_titles = [chapter.title or f"章节{idx+1}" for idx, chapter in enumerate(state.chapters)]
+        tab_titles = [chapter.title or f"章{idx+1}" for idx, chapter in enumerate(state.chapters)]
         tabs = st.tabs(tab_titles)
         for idx, (chapter, tab) in enumerate(zip(state.chapters, tabs)):
             with tab:
-                # 章节标题和概要可编辑
-                chapter_title = st.text_input(f"章节{idx+1}标题", value=chapter.title or f"章节{idx+1}", key=f"chapter_title_{idx}")
-                chapter_overview = st.text_area(f"章节{idx+1}概要", value=chapter.overview or "", key=f"chapter_overview_{idx}")
+                # 章标题和概要可编辑
+                chapter_title = st.text_input(f"章{idx+1}标题", value=chapter.title or f"章{idx+1}", key=f"chapter_title_{idx}")
+                chapter_overview = st.text_area(f"章{idx+1}概要", value=chapter.overview or "", key=f"chapter_overview_{idx}")
                 chapter.title = chapter_title
                 chapter.overview = chapter_overview
-                # 生成sections按钮
-                if st.button(f"为本章节生成小节", key=f"gen_sections_{idx}"):
-                    writer.design_sections(idx)
-                    st.success(f"已为{chapter_title}生成小节！")
+                # 节数量选择+生成节按钮同列
+                col_sec1, col_sec2 = st.columns([2,2])
+                with col_sec1:
+                    section_count = st.selectbox(f"节数量", options=["AUTO"] + [str(i) for i in range(1, 21)], index=0, key=f"section_count_{idx}")
+                with col_sec2:
+                    if st.button(f"为本章生成节", key=f"gen_sections_{idx}"):
+                        writer.design_sections(idx, section_count=None if section_count=="AUTO" else int(section_count))
+                        st.success(f"已为{chapter_title}生成节！")
                 # 展示并可编辑sections
                 if chapter.sections:
-                    st.markdown("**小节列表：**")
+                    st.markdown("**节列表：**")
                     for sidx, section in enumerate(chapter.sections):
-                        sec_title = st.text_input(f"章节{idx+1}小节{sidx+1}标题", value=section.title or "", key=f"section_title_{idx}_{sidx}")
-                        sec_overview = st.text_area(f"章节{idx+1}小节{sidx+1}概要", value=section.overview or "", key=f"section_overview_{idx}_{sidx}")
+                        sec_title = st.text_input(f"章{idx+1}节{sidx+1}标题", value=section.title or "", key=f"section_title_{idx}_{sidx}")
+                        sec_overview = st.text_area(f"章{idx+1}节{sidx+1}概要", value=section.overview or "", key=f"section_overview_{idx}_{sidx}")
                         # 生成正文按钮
-                        if st.button(f"生成章节{idx+1}小节{sidx+1}正文", key=f"gen_content_{idx}_{sidx}"):
+                        if st.button(f"生成章{idx+1}节{sidx+1}正文", key=f"gen_content_{idx}_{sidx}"):
                             writer.write_section_content(idx, sidx)
-                            st.success(f"已为章节{idx+1}小节{sidx+1}生成正文！")
+                            st.success(f"已为章{idx+1}节{sidx+1}生成正文！")
                         # 正文内容自适应高度
                         sec_content = st.text_area(
-                            f"章节{idx+1}小节{sidx+1}内容",
+                            f"章{idx+1}节{sidx+1}内容",
                             value=section.content or "",
                             key=f"section_content_{idx}_{sidx}",
                             height=400  # 设置较大的默认高度
