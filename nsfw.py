@@ -39,13 +39,12 @@ Always output in valid JSON format as required.
 """
 
 MODEL_OPTIONS = [
+    "x-ai/grok-3-mini-beta",
     "google/gemini-2.5-flash-preview-05-20",
     "deepseek/deepseek-chat-v3-0324",
     "deepseek/deepseek-chat-v3-0324:free",
-    "x-ai/grok-3-mini-beta",
     "x-ai/grok-3-beta",
-    "openai/gpt-4o",
-    "openai/gpt-3.5-turbo",
+    "openai/gpt-4o"
     # 可根据需要添加更多模型
 ]
 

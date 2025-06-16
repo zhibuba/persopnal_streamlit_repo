@@ -1,9 +1,7 @@
 from pydantic import BaseModel, Field, RootModel
 import uuid
-import sqlite3
-import json
-import functools
 from datetime import datetime
+from persist import persist_novel_state
 
 
 class NSFWCharacter(BaseModel):
@@ -78,37 +76,6 @@ class NSFWNovel(BaseModel):
     characters: list[NSFWCharacter] = Field(default_factory=list, description="A list of NSFW characters in the novel.")
     chapters: list[NSFWChapter] = Field(default_factory=list, description="A list of NSFW chapters in the novel.")
     exported_markdown: str | None = Field(default=None, description="The exported markdown of the novel.")
-
-# 持久化装饰器
-def persist_novel_state(method):
-    @functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        result = method(self, *args, **kwargs)
-        novel = self.state
-        db_path = 'novel_state.db'
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS nsfw_novel (
-            id TEXT PRIMARY KEY,
-            state_json TEXT,
-            create_time TEXT,
-            update_time TEXT,
-            version INTEGER
-        )''')
-        now = datetime.now().isoformat()
-        state_json = json.dumps(novel.model_dump(), ensure_ascii=False)
-        c.execute('SELECT id FROM nsfw_novel WHERE id=?', (novel.uuid,))
-        row = c.fetchone()
-        if row:
-            c.execute('UPDATE nsfw_novel SET state_json=?, update_time=?, version=version+1 WHERE id=?',
-                      (state_json, now, novel.uuid))
-        else:
-            c.execute('INSERT INTO nsfw_novel (id, state_json, create_time, update_time, version) VALUES (?, ?, ?, ?, ?)',
-                      (novel.uuid, state_json, now, now, 1))
-        conn.commit()
-        conn.close()
-        return result
-    return wrapper
 
 class ListModel[T](RootModel[T]):
     root: list[T]

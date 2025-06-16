@@ -1,9 +1,9 @@
 import streamlit as st
 import os
 import json
-import sqlite3
 from nsfw import NsfwNovelWriter, MODEL_OPTIONS
 from domains import NSFWNovel
+from persist import get_history_page, save
 
 if not os.environ["OPENAI_API_KEY"]:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
@@ -39,6 +39,10 @@ if 'writer' not in st.session_state:
 writer: NsfwNovelWriter = st.session_state['writer']
 state = writer.state
 
+def rerun():
+    save(state)
+    st.rerun()
+
 # 导出/导入/导出Markdown同一行
 col_model, col_export, col_import, col_md, col_history = st.columns(5)
 with col_model:
@@ -70,7 +74,7 @@ with col_import:
                 st.success("导入成功！")
                 st.session_state.pop("import_json_uploader", None)
                 st.session_state.pop("import_json_data", None)
-                st.rerun()
+                rerun()
             except Exception as e:
                 st.error(f"导入失败: {e}")
 with col_md:
@@ -87,18 +91,7 @@ if st.session_state.get('show_history', False):
     st.markdown("### 历史记录")
     PAGE_SIZE = 10
     page = st.session_state.get('history_page', 1)
-    conn = sqlite3.connect('novel_state.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS nsfw_novel (
-        id TEXT PRIMARY KEY,
-        state_json TEXT,
-        create_time TEXT,
-        update_time TEXT,
-        version INTEGER
-    )''')
-    total_count = c.execute('SELECT COUNT(*) FROM nsfw_novel').fetchone()[0]
-    rows = c.execute('SELECT id, state_json, create_time, update_time, version FROM nsfw_novel ORDER BY update_time DESC LIMIT ? OFFSET ?', (PAGE_SIZE, (page-1)*PAGE_SIZE)).fetchall()
-    conn.close()
+    total_count, rows = get_history_page(page, PAGE_SIZE)
     for row in rows:
         rid, state_json, create_time, update_time, version = row
         try:
@@ -120,20 +113,20 @@ if st.session_state.get('show_history', False):
                 st.session_state['writer'].state = NSFWNovel.model_validate(state_obj)
                 st.success("历史记录已导入！")
                 st.session_state['show_history'] = False
-                st.rerun()
+                rerun()
     # 分页控件
     total_pages = (total_count + PAGE_SIZE - 1) // PAGE_SIZE
     col_prev, col_page, col_next = st.columns([2,2,2])
     with col_prev:
         if page > 1 and st.button("上一页", key="history_prev"):
             st.session_state['history_page'] = page - 1
-            st.rerun()
+            rerun()
     with col_page:
         st.markdown(f"第 {page} / {total_pages} 页")
     with col_next:
         if page < total_pages and st.button("下一页", key="history_next"):
             st.session_state['history_page'] = page + 1
-            st.rerun()
+            rerun()
 
 # 需求输入
 requirements = st.text_area(
@@ -157,7 +150,7 @@ with col_reset:
     if st.button("重置"):
         st.session_state['writer'] = NsfwNovelWriter()
         st.success("已重置所有内容！")
-        st.rerun()
+        rerun()
 
 
 # 标题和概要编辑
@@ -183,7 +176,7 @@ if state.title is not None:
         state.characters[idx].description = edited_desc
     if remove_idx is not None:
         del state.characters[remove_idx]
-        st.rerun()
+        rerun()
     # 增加角色（同一行，on_click清空输入）
     def _add_character_inputs():
         from domains import NSFWCharacter
@@ -210,7 +203,7 @@ if state.title is not None:
                 for chapter in state.chapters:
                     chapter.sections.clear()
                 st.success('章概要生成成功！')
-                st.rerun()
+                rerun()
             else:
                 st.warning('请先生成小说概要后再生成章概要。')
     with col_ch3:
@@ -221,7 +214,7 @@ if state.title is not None:
             for idx, chapter in enumerate(state.chapters):
                 oneclick_generate_chapter(writer, idx, progress_placeholder=progress_placeholder, chapters_progress=f"（{idx + 1}/{len(state.chapters)}）")
             progress_placeholder.success("已为所有章节一键生成概要和正文！")
-            st.rerun()
+            rerun()
 
     # 展示章概要及其节编辑与生成
     if state.chapters:
@@ -235,11 +228,11 @@ if state.title is not None:
                     if st.button(f"添加下一章", key=f"add_chapter_after_{idx}"):
                         from domains import NSFWChapter
                         state.chapters.insert(idx+1, NSFWChapter(title="", overview="", sections=[]))
-                        st.rerun()
+                        rerun()
                 with col_ch_del:
                     if st.button(f"删除本章", key=f"delete_chapter_{idx}"):
                         del state.chapters[idx]
-                        st.rerun()
+                        rerun()
                 # 章标题和概要可编辑
                 chapter_title = st.text_input(f"第{idx+1}章标题", value=chapter.title or f"第{idx+1}章", key=f"chapter_title_{idx}")
                 chapter_overview = st.text_area(f"第{idx+1}章概要", value=chapter.overview or "", key=f"chapter_overview_{idx}")
@@ -253,13 +246,13 @@ if state.title is not None:
                     if st.button(f"生成节概要", key=f"gen_sections_{idx}"):
                         writer.design_sections(idx, section_count=None if section_count=="AUTO" else int(section_count))
                         st.success(f"已为{chapter_title}生成节！")
-                        st.rerun()
+                        rerun()
                 with col_sec3:
                     if st.button(f"一键生成本章", key=f"oneclick_gen_{idx}"):
                         progress_placeholder = st.empty()
                         oneclick_generate_chapter(writer, idx, section_count=None if section_count=="AUTO" else int(section_count), progress_placeholder=progress_placeholder)
                         progress_placeholder.success(f"已为第{idx+1}章一键生成所有节概要和正文！")
-                        st.rerun()
+                        rerun()
                 # 展示并可编辑sections
                 for sidx, section in enumerate(chapter.sections):
                     col_secA, col_secB = st.columns([4, 8])
@@ -271,7 +264,7 @@ if state.title is not None:
                     if st.button(f"生成第{idx+1}章第{sidx+1}节正文", key=f"gen_content_{idx}_{sidx}"):
                         writer.write_content(idx, sidx)
                         st.success(f"已为第{idx+1}章第{sidx+1}节生成正文！")
-                        st.rerun()
+                        rerun()
                     # 写回state
                     section.title = sec_title
                     section.overview = sec_overview
@@ -290,11 +283,11 @@ if state.title is not None:
                         if st.button(f"添加下一节", key=f"add_section_after_{idx}_{sidx}"):
                             from domains import NSFWSection
                             chapter.sections.insert(sidx+1, NSFWSection(title="", overview="", content=None))
-                            st.rerun()
+                            rerun()
                     with col_sec_del:
                         if st.button(f"删除本节", key=f"delete_section_{idx}_{sidx}"):
                             del chapter.sections[sidx]
-                            st.rerun()
+                            rerun()
                     # 角色当前状态展示（衣着、心理、生理），默认折叠，可展开并编辑
                     if section.after_state:
                         with st.expander("本节后角色状态", expanded=False):
@@ -307,4 +300,5 @@ if state.title is not None:
                                 cstate.clothing = clothing
                                 cstate.psychological = psychological
                                 cstate.physiological = physiological
+
 
