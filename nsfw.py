@@ -9,6 +9,7 @@ from langchain_core.callbacks.base import BaseCallbackHandler
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from domains import *
+from domains import persist_novel_state
 
 # 配置logging
 logging.basicConfig(filename="nsfw.log", level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s', encoding='utf-8')
@@ -51,19 +52,7 @@ MODEL_OPTIONS = [
 class NsfwNovelWriter:
     def __init__(self, model_name=MODEL_OPTIONS[0]):
     
-        self.model = ChatOpenAI(
-            model=model_name,
-            base_url="https://openrouter.ai/api/v1",
-            callbacks=[LLMLoggingCallbackHandler()],
-            model_kwargs={
-                "extra_body": {"safety_settings": [
-                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                ]}
-            }
-        )
+        self.set_model(model_name)
         self.state = NSFWNovel()
         
     def set_model(self, model_name: str):
@@ -81,6 +70,7 @@ class NsfwNovelWriter:
             }
         )
 
+    @persist_novel_state
     def design_overall(self, requirements: str):
         """
         生成小说概要（由LLM推断语言或用户指定），并直接生成角色列表。
@@ -123,6 +113,7 @@ Design an overall plot for a NSFW novel based on the requirements above. The des
         self.state.characters = result.characters
         # 初始化各角色状态（已删除 current_state）
 
+    @persist_novel_state
     def design_chapters(self, chapter_count=None):
         """
         根据小说的标题、概要、语言、角色生成章概要(NSFWPlots)，并更新state.chapters。
@@ -172,6 +163,7 @@ Based on the above information, design a summary and a list of main plots/chapte
         ])
         self.state.chapters = [NSFWChapter(title=plot.title, overview=plot.overview, sections=[]) for plot in result.chapters]
 
+    @persist_novel_state
     def design_sections(self, chapter_index: int, section_count=None):
         """
         根据指定章概要，生成该章的sections概要(NSFWPlot)，并更新state.chapters[chapter_index].sections（仅title和overview）。
@@ -240,6 +232,7 @@ Based on the above information, design a list of sections for this chapter. Each
         prev_section = self._get_prev_section(chapter_index, section_index)
         return getattr(prev_section, 'after_state', None) if prev_section else None
 
+    @persist_novel_state
     def write_content(self, chapter_index: int, section_index: int) -> SectionContentResponse:
         """
         Generate the content for the specified chapter and section, and return a SectionContentResponse.
@@ -341,6 +334,7 @@ The language must be {self.state.language}. Make the content as erotic, logical,
             f"- **{c.name}**: {c.description}" for c in self.state.characters
         ])
 
+    @persist_novel_state
     def export_markdown(self) -> str:
         """
         导出当前 state 为完整小说的 markdown 文本，结构分明，适合阅读，并自动生成目录。

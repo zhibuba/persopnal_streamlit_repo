@@ -306,3 +306,4 @@ fabric.properties
 
 
 llm_log.txt
+*.db

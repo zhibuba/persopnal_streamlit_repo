@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import json
+import sqlite3
 from nsfw import NsfwNovelWriter, MODEL_OPTIONS
 from domains import NSFWNovel
 
@@ -39,7 +40,7 @@ writer: NsfwNovelWriter = st.session_state['writer']
 state = writer.state
 
 # 导出/导入/导出Markdown同一行
-col_model, col_export, col_import, col_md = st.columns(4)
+col_model, col_export, col_import, col_md, col_history = st.columns(5)
 with col_model:
     model_choice = st.selectbox("选择模型", options=MODEL_OPTIONS, index=0, key="model_select")
     if getattr(writer.model, 'model', None) != model_choice:
@@ -78,6 +79,61 @@ with col_md:
         st.success('已生成导出文件！')
     if state.exported_markdown:
         st.download_button('下载导出Markdown', data=state.exported_markdown, file_name=f"{state.title or 'NSFW小说'}.md", mime='text/markdown')
+with col_history:
+    if st.button("历史记录"):
+        st.session_state['show_history'] = not st.session_state.get('show_history', False)
+
+if st.session_state.get('show_history', False):
+    st.markdown("### 历史记录")
+    PAGE_SIZE = 10
+    page = st.session_state.get('history_page', 1)
+    conn = sqlite3.connect('novel_state.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS nsfw_novel (
+        id TEXT PRIMARY KEY,
+        state_json TEXT,
+        create_time TEXT,
+        update_time TEXT,
+        version INTEGER
+    )''')
+    total_count = c.execute('SELECT COUNT(*) FROM nsfw_novel').fetchone()[0]
+    rows = c.execute('SELECT id, state_json, create_time, update_time, version FROM nsfw_novel ORDER BY update_time DESC LIMIT ? OFFSET ?', (PAGE_SIZE, (page-1)*PAGE_SIZE)).fetchall()
+    conn.close()
+    for row in rows:
+        rid, state_json, create_time, update_time, version = row
+        try:
+            state_obj = json.loads(state_json)
+        except Exception:
+            state_obj = {}
+        col1, col2, col3, col4, col5 = st.columns([3,3,3,2,2])
+        with col1:
+            st.markdown(f"**标题：** {state_obj.get('title', '')}")
+        with col2:
+            st.markdown(f"**语言：** {state_obj.get('language', '')}")
+        with col3:
+            st.markdown(f"**更新时间：** {update_time[:19]}")
+        with col4:
+            st.markdown(f"**版本：** {version}")
+        with col5:
+            if st.button("导入", key=f"import_history_{rid}"):
+                st.session_state['writer'] = NsfwNovelWriter()
+                st.session_state['writer'].state = NSFWNovel.model_validate(state_obj)
+                st.success("历史记录已导入！")
+                st.session_state['show_history'] = False
+                st.rerun()
+    # 分页控件
+    total_pages = (total_count + PAGE_SIZE - 1) // PAGE_SIZE
+    col_prev, col_page, col_next = st.columns([2,2,2])
+    with col_prev:
+        if page > 1 and st.button("上一页", key="history_prev"):
+            st.session_state['history_page'] = page - 1
+            st.rerun()
+    with col_page:
+        st.markdown(f"第 {page} / {total_pages} 页")
+    with col_next:
+        if page < total_pages and st.button("下一页", key="history_next"):
+            st.session_state['history_page'] = page + 1
+            st.rerun()
 
 # 需求输入
 requirements = st.text_area(
