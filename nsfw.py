@@ -24,18 +24,7 @@ class LLMLoggingCallbackHandler(BaseCallbackHandler):
     def on_llm_error(self, *args, **kwargs):
         logging.error(f"LLM error with args: {args}, kwargs: {kwargs}")
     
-model = ChatOpenAI(model="google/gemini-2.5-flash-preview-05-20",
-    base_url="https://openrouter.ai/api/v1",
-    callbacks=[LLMLoggingCallbackHandler()],
-    model_kwargs={
-        "extra_body": {"safety_settings": [
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-        ]
-        }
-    })
+
 
 json_method = 'json_mode'
 
@@ -48,10 +37,49 @@ Your primary goal is to generate content that is as erotic, explicit, and logica
 Always output in valid JSON format as required.
 """
 
+MODEL_OPTIONS = [
+    "google/gemini-2.5-flash-preview-05-20",
+    "deepseek/deepseek-chat-v3-0324",
+    "deepseek/deepseek-chat-v3-0324:free",
+    "x-ai/grok-3-mini-beta",
+    "x-ai/grok-3-beta",
+    "openai/gpt-4o",
+    "openai/gpt-3.5-turbo",
+    # 可根据需要添加更多模型
+]
+
 class NsfwNovelWriter:
-    def __init__(self):
-        self.model = model
+    def __init__(self, model_name=MODEL_OPTIONS[0]):
+    
+        self.model = ChatOpenAI(
+            model=model_name,
+            base_url="https://openrouter.ai/api/v1",
+            callbacks=[LLMLoggingCallbackHandler()],
+            model_kwargs={
+                "extra_body": {"safety_settings": [
+                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                ]}
+            }
+        )
         self.state = NSFWNovel()
+        
+    def set_model(self, model_name: str):
+        self.model = ChatOpenAI(
+            model=model_name,
+            base_url="https://openrouter.ai/api/v1",
+            callbacks=[LLMLoggingCallbackHandler()],
+            model_kwargs={
+                "extra_body": {"safety_settings": [
+                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                ]}
+            }
+        )
 
     def design_overall(self, requirements: str):
         """
@@ -62,19 +90,26 @@ You are a professional NSFW novel writer.
 {NSFW_OBJECTIVE}
 You are responsible for designing the overall plot and main characters for the novel. Focus on creativity, diversity, and logical consistency in the plot and character design.
 
+**Additional Requirements:**
+- The `overview` must clearly and logically outline the main storyline from beginning to end, including the key stages, major events, and turning points. Avoid vague or purely atmospheric descriptions.
+- The `overview` should be structured and easy to follow, allowing the reader to grasp the full narrative arc at a glance. Use paragraphs or bullet points to clarify the main progression (e.g., beginning, development, climax, resolution).
+- The `overview` must reflect the concrete development of the story, not just background or setting.
+- Also include a concise list of the novel's design ideas or key creative concepts , summarizing the intended style, themes, and unique features of the novel, in the same language as the overview.
+
 Return your answer in the following JSON format:
 ```json
 {{
   "title": "The title of the NSFW novel",
-  "overview": "A brief overview of the NSFW novel's plot",
+  "overview": "A clear, structured overview of the NSFW novel's main plot, from start to finish, with key stages and turning points, and a list of design ideas.",
+  
   "language": "The language of the NSFW novel",
-  "characters": [{{"name": "角色名", "description": "描述..."}}, ...]
+  "characters": [{{"name": "the name of the character", "description": "the description and role"}}, ...]
 }}
 ```
 """)
         human_message = HumanMessage(content=f"""
 Requirements: {requirements}
-Design an overall plot for a NSFW novel based on the requirements above. The design should include a title and a brief overview of the plot, both in the determined language. Then, based on the title and overview, design a list of main characters for the NSFW novel. For each character, return an object with name and description fields.
+Design an overall plot for a NSFW novel based on the requirements above. The design should include a title, a clear and structured overview of the plot (with main storyline and key turning points), and a list of design ideas or key creative concepts. Then, based on the title and overview, design a list of main characters for the NSFW novel. For each character, return an object with name and description fields.
 """)
         llm = self.model.with_structured_output(NSFWOverallDesign, method=json_method).with_retry()
         result: NSFWOverallDesign = llm.invoke([
@@ -99,18 +134,23 @@ You are a professional NSFW novel writer.
 You are responsible for designing the overall chapter structure and chapter overviews for the novel.
 
 **Requirements:**
+- Return a list of chapters, each as an object with `title` and `overview` fields.
 - Each chapter overview must focus on the main storyline progression of the entire novel, outlining the key stage, major events, and global turning points for that chapter.
 - Emphasize the logical relationship and progression between chapters, ensuring each chapter builds upon the previous and sets up the next.
 - Highlight the chapter's role in the overall narrative arc, including any phase climax or major plot twist.
+- The main characters should reach sexual climax or significant emotional turning points in each chapter, with a focus on character development and relationship dynamics.
+- State the participants and ways of NSFW actions in this chapter clearly if there are nsfw actions in this chapter.
 - Avoid vague or fragmented summaries; provide a clear, structured framework for the novel's development.
 - Do NOT include chapter numbers or sequence indicators in the chapter titles.
 
-Return your answer in the following JSON format (in a markdown code block):
+Return your answer in the following JSON format:
 ```json
-[
-  {{"title": "The title of the first chapter", "overview": "A brief overview of the chapter1's main plot and its role in the overall story"}},
-  {{"title": "The title of the second chapter", "overview": "A brief overview of the chapter2's main plot and its role in the overall story"}}
-]
+{{
+  "chapters": [
+    {{"title": "The title of the first chapter", "overview": "A brief overview of the chapter1's main plot, nsfw actions and its role in the overall story"}},
+    {{"title": "The title of the second chapter", "overview": "A brief overview of the chapter2's main plot, nsfw actions and its role in the overall story"}}
+  ]
+}}
 ```
 """)
         extra = ""
@@ -122,14 +162,15 @@ Title: {self.state.title}
 Overview: {self.state.overview}
 Characters: {[{'name': c.name, 'description': c.description} for c in self.state.characters]}
 {extra}
-Based on the above information, design a summary and a list of main plots/chapters for the NSFW novel. Each plot should have a title and a brief overview, all in the specified language.
+User Requirements: {self.state.requirements}
+Based on the above information, design a summary and a list of main plots/chapters for the NSFW novel. Return a JSON object with a `chapters` field containing the list of chapters, each with a title and overview, all in the specified language.
 """)
-        llm = self.model.with_structured_output(ListModel[NSFWPlot], method=json_method).with_retry()
-        result: ListModel[NSFWPlot] = llm.invoke([
+        llm = self.model.with_structured_output(NSFWChapterResponse, method=json_method).with_retry()
+        result: NSFWChapterResponse = llm.invoke([
             system_message,
             human_message
         ])
-        self.state.chapters = [NSFWChapter(title=plot.title, overview=plot.overview, sections=[]) for plot in result.root]
+        self.state.chapters = [NSFWChapter(title=plot.title, overview=plot.overview, sections=[]) for plot in result.chapters]
 
     def design_sections(self, chapter_index: int, section_count=None):
         """
@@ -143,18 +184,22 @@ You are a professional NSFW novel writer.
 You are responsible for designing the section structure and section overviews for the current chapter.
 
 **Requirements:**
+- Return a list of sections, each as an object with `title` and `overview` fields, in a JSON object with a `sections` field.
 - Each section overview must focus on the concrete plot development within this chapter, including specific events, character conflicts, emotional changes, and minor turning points.
 - Ensure each section advances the chapter's main storyline, with a clear beginning, development, climax, and resolution for that section.
 - Emphasize how each section serves the chapter's main plot and deepens character relationships or conflicts.
+- State the participants and ways of NSFW actions in this section clearly if there are nsfw actions in this section.
 - Avoid vague or generic summaries; provide actionable, detailed frameworks for subsequent writing.
 - Do NOT include section numbers or sequence indicators in the section titles.
 
 Return your answer in the following JSON format:
 ```json
-[
-  {{"title": "The title of the first section", "overview": "A brief but concrete description of the section's plot and its function in the chapter"}},
-  {{"title": "The title of the second section", "overview": "A brief but concrete description of the section's plot and its function in the chapter"}}
-]
+{{
+  "sections": [
+    {{"title": "The title of the first section", "overview": "A brief but complete description of the section's plot, nsfw actions (if exist) and its function in the chapter"}},
+    {{"title": "The title of the second section", "overview": "A brief but complete description of the section's plot, nsfw actions (if exist) and its function in the chapter"}}
+  ]
+}}
 ```
 """)
         extra = ""
@@ -170,14 +215,14 @@ Characters: {[{'name': c.name, 'description': c.description} for c in self.state
 {extra}
 Based on the above information, design a list of sections for this chapter. Each section should have a title and a brief overview, all in the specified language.
 """)
-        llm = self.model.with_structured_output(ListModel[NSFWPlot], method=json_method).with_retry()
-        result = llm.invoke([
+        llm = self.model.with_structured_output(NSFWSectionResponse, method=json_method).with_retry()
+        result: NSFWSectionResponse = llm.invoke([
             system_message,
             human_message
         ])
         chapter.sections = [
             NSFWSection(title=section.title, overview=section.overview, content=None)
-            for section in result.root
+            for section in result.sections
         ]
 
     def _get_prev_section(self, chapter_index, section_index) -> NSFWSection | None:

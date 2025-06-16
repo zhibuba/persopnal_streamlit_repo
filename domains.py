@@ -50,6 +50,13 @@ class NSFWChapter(BaseModel):
     title: str | None = Field(default=None, description="The title of the NSFW chapter.")
     overview: str | None = Field(default=None, description="A brief overview of the NSFW chapter.")
     sections: list[NSFWSection] = Field(default_factory=list, description="A list of NSFW sections in the chapter.")
+    
+    
+class NSFWSectionResponse(BaseModel):
+     sections: list[NSFWChapter] = Field(default_factory=list, description="A list of NSFW sections.")
+    
+class NSFWChapterResponse(BaseModel):
+     chapters: list[NSFWChapter] = Field(default_factory=list, description="A list of NSFW chapters.")
  
 class NSFWOverallDesign(BaseModel):
     title: str | None = Field(default=None, description="The title of the NSFW novel.")

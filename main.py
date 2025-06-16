@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import json
-from nsfw import NsfwNovelWriter
+from nsfw import NsfwNovelWriter, MODEL_OPTIONS
 from domains import NSFWNovel
 
 if not os.environ["OPENAI_API_KEY"]:
@@ -39,7 +39,11 @@ writer: NsfwNovelWriter = st.session_state['writer']
 state = writer.state
 
 # 导出/导入/导出Markdown同一行
-col_export, col_import, col_md = st.columns(3)
+col_model, col_export, col_import, col_md = st.columns(4)
+with col_model:
+    model_choice = st.selectbox("选择模型", options=MODEL_OPTIONS, index=0, key="model_select")
+    if getattr(writer.model, 'model', None) != model_choice:
+        writer.set_model(model_choice)
 with col_export:
     if st.button("导出为JSON"):
         st.download_button(
