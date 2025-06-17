@@ -40,7 +40,7 @@ writer: NsfwNovelWriter = st.session_state['writer']
 state = writer.state
 
 def rerun():
-    if state.requirements or state.title or state.overview or state.language or state.characters:
+    if state.plot_requirements or state.title or state.overview or state.language or state.characters:
         save(state)
     st.rerun()
 
@@ -151,23 +151,31 @@ if st.session_state.get('show_delete_confirm', False):
     delete_confirm_dialog()
 
 # 需求输入
-requirements = st.text_area(
-    "输入你的 NSFW 小说需求：",
-    height=150,
-    value=state.requirements or "",
-    key="requirements_input"
+plot_requirements = st.text_area(
+    "你想要怎样的情节（情节要求）",
+    height=100,
+    value=state.plot_requirements or "",
+    key="plot_requirements_input"
 )
-writer.state.requirements = requirements
+state.plot_requirements = plot_requirements
+
+writing_requirements = st.text_area(
+    "你对小说创作有哪些要求（写作要求）",
+    height=80,
+    value=state.writing_requirements or "",
+    key="writing_requirements_input"
+)
+state.writing_requirements = writing_requirements
 
 # 生成/重置按钮同一行
 col_gen, col_reset = st.columns(2)
 with col_gen:
     if st.button("生成小说概要"):
-        if requirements.strip():
-            writer.design_overall(requirements)
+        if plot_requirements.strip():
+            writer.design_overall(plot_requirements, writing_requirements)
             st.success("生成成功！")
         else:
-            st.warning("请输入需求后再生成。")
+            st.warning("请输入情节要求后再生成。")
 with col_reset:
     if st.button("重置"):
         st.session_state['writer'] = NsfwNovelWriter()

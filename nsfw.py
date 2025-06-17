@@ -70,7 +70,7 @@ class NsfwNovelWriter:
         )
 
     @persist_novel_state
-    def design_overall(self, requirements: str):
+    def design_overall(self, plot_requirements: str, writing_requirements: str):
         """
         生成小说概要（由LLM推断语言或用户指定），并直接生成角色列表。
         """
@@ -90,14 +90,14 @@ Return your answer in the following JSON format:
 {{
   "title": "The title of the NSFW novel",
   "overview": "A clear, structured overview of the NSFW novel's main plot, from start to finish, with key stages and turning points, and a list of design ideas.",
-  
   "language": "The language of the NSFW novel",
   "characters": [{{"name": "the name of the character", "description": "the description and role"}}, ...]
 }}
 ```
 """)
         human_message = HumanMessage(content=f"""
-Requirements: {requirements}
+Plot Requirements: {plot_requirements}
+Writing Requirements: {writing_requirements}
 Design an overall plot for a NSFW novel based on the requirements above. The design should include a title, a clear and structured overview of the plot (with main storyline and key turning points), and a list of design ideas or key creative concepts. Then, based on the title and overview, design a list of main characters for the NSFW novel. For each character, return an object with name and description fields.
 """)
         llm = self.model.with_structured_output(NSFWOverallDesign, method=json_method).with_retry()
@@ -105,7 +105,8 @@ Design an overall plot for a NSFW novel based on the requirements above. The des
             system_message,
             human_message
         ])
-        self.state.requirements = requirements
+        self.state.plot_requirements = plot_requirements
+        self.state.writing_requirements = writing_requirements
         self.state.title = result.title
         self.state.overview = result.overview
         self.state.language = result.language
@@ -152,7 +153,8 @@ Title: {self.state.title}
 Overview: {self.state.overview}
 Characters: {[{'name': c.name, 'description': c.description} for c in self.state.characters]}
 {extra}
-User Requirements: {self.state.requirements}
+Plot Requirements: {self.state.plot_requirements}
+Writing Requirements: {self.state.writing_requirements}
 Based on the above information, design a summary and a list of main plots/chapters for the NSFW novel. Return a JSON object with a `chapters` field containing the list of chapters, each with a title and overview, all in the specified language.
 """)
         llm = self.model.with_structured_output(NSFWChapterResponse, method=json_method).with_retry()
@@ -198,12 +200,16 @@ Return your answer in the following JSON format:
             extra = f"\nThis chapter should have exactly {section_count} sections."
         human_message = HumanMessage(content=f"""
 Language: {self.state.language}
-Title: {self.state.title}
-Overview: {self.state.overview}
+Novel Title: {self.state.title}
+User Novel-Level Plot Requirements: {self.state.plot_requirements}
+User Writing Requirements: {self.state.writing_requirements}
+Novel Overview: {self.state.overview}
 Chapter Title: {chapter.title}
 Chapter Overview: {chapter.overview}
 Characters: {[{'name': c.name, 'description': c.description} for c in self.state.characters]}
 {extra}
+
+
 Based on the above information, design a list of sections for this chapter. Each section should have a title and a brief overview, all in the specified language.
 """)
         llm = self.model.with_structured_output(NSFWSectionResponse, method=json_method).with_retry()
@@ -306,6 +312,9 @@ Return your answer in the following JSON format:
 
 ## Current Character States (for incremental update)
 {prev_after_state}
+
+## User Writing Requirements
+{self.state.writing_requirements}
 
 {'**Previous Section Content:**\n' + prev_content if prev_content else ''}
 
