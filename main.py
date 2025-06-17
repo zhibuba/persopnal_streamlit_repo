@@ -54,7 +54,7 @@ with col_export:
     if st.button("导出为JSON"):
         st.download_button(
             label="下载JSON",
-            data=json.dumps(state.model_dump(), ensure_ascii=False, indent=2),
+            data=state.model_dump_json(),
             file_name=f"{state.title or 'NSFW小说'}.json",
             mime="application/json"
         )
@@ -110,13 +110,11 @@ def history_dialog():
                 st.session_state['writer'] = NsfwNovelWriter()
                 st.session_state['writer'].state = NSFWNovel.model_validate(state_obj)
                 st.success("历史记录已导入！")
-                st.session_state['show_history'] = False
                 rerun()
         with col6:
             if st.button("删除", key=f"delete_history_{rid}"):
                 st.session_state['delete_confirm_id'] = rid
                 st.session_state['show_delete_confirm'] = True
-                st.session_state['show_history'] = False
                 rerun()
     # 分页控件
     total_pages = (total_count + PAGE_SIZE - 1) // PAGE_SIZE
@@ -333,8 +331,8 @@ def chapter_area():
             with tab:
                 single_chapter_area(idx, chapter)
                 
-if state.chapters:
-    chapter_area()
+
+chapter_area()
 
 
 
