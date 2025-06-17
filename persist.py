@@ -2,6 +2,7 @@ import sqlite3
 import json
 import functools
 from datetime import datetime
+from domains import NSFWNovel
 
 def persist_novel_state(method):
     @functools.wraps(method)
@@ -12,7 +13,7 @@ def persist_novel_state(method):
         return result
     return wrapper
 
-def save(novel):
+def save(novel: NSFWNovel):
     db_path = 'novel_state.db'
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
@@ -24,7 +25,7 @@ def save(novel):
         version INTEGER
     )''')
     now = datetime.now().isoformat()
-    state_json = json.dumps(novel.model_dump(), ensure_ascii=False)
+    state_json = novel.model_dump_json()
     c.execute('SELECT id FROM nsfw_novel WHERE id=?', (novel.uuid,))
     row = c.fetchone()
     if row:
@@ -51,3 +52,11 @@ def get_history_page(page: int, page_size: int):
     rows = c.execute('SELECT id, state_json, create_time, update_time, version FROM nsfw_novel ORDER BY update_time DESC LIMIT ? OFFSET ?', (page_size, (page-1)*page_size)).fetchall()
     conn.close()
     return total_count, rows
+
+def delete_novel(uuid: str):
+    db_path = 'novel_state.db'
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute('DELETE FROM nsfw_novel WHERE id=?', (uuid,))
+    conn.commit()
+    conn.close()

@@ -1,8 +1,5 @@
 from pydantic import BaseModel, Field, RootModel
 import uuid
-from datetime import datetime
-from persist import persist_novel_state
-
 
 class NSFWCharacter(BaseModel):
     name: str = Field(..., description="角色名")
