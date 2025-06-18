@@ -53,7 +53,7 @@ class NSFWChapter(BaseModel):
     
     
 class NSFWSectionResponse(BaseModel):
-     sections: list[NSFWChapter] = Field(default_factory=list, description="A list of NSFW sections.")
+     sections: list[NSFWSection] = Field(default_factory=list, description="A list of NSFW sections.")
     
 class NSFWChapterResponse(BaseModel):
      chapters: list[NSFWChapter] = Field(default_factory=list, description="A list of NSFW chapters.")
@@ -66,7 +66,8 @@ class NSFWOverallDesign(BaseModel):
     
 class NSFWNovel(BaseModel):
     uuid: str = Field(default_factory=lambda: str(uuid.uuid4()), description="The unique id for the NSFW novel.")
-    requirements: str | None = Field(default=None, description="The requirements for the NSFW novel.")
+    plot_requirements: str | None = Field(default=None, description="The plot requirements for the NSFW novel.")
+    writing_requirements: str | None = Field(default=None, description="The writing requirements for the NSFW novel.")
     title: str | None = Field(default=None, description="The title of the NSFW novel.")
     overview: str | None = Field(default=None, description="A brief overview of the NSFW novel's plot.")
     language: str | None = Field(default=None, description="The language of the NSFW novel.")
