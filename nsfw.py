@@ -39,12 +39,16 @@ Always output in valid JSON format as required.
 """
 
 MODEL_OPTIONS = [
-    "x-ai/grok-3-mini-beta",
     "google/gemini-2.5-flash-preview-05-20",
+    "google/gemini-2.5-pro-preview",
+    "google/gemini-2.0-flash-001",
+    "x-ai/grok-3-mini-beta",
+    "x-ai/grok-3-beta",
     "deepseek/deepseek-chat-v3-0324",
     "deepseek/deepseek-chat-v3-0324:free",
-    "x-ai/grok-3-beta",
-    "openai/gpt-4o"
+    "deepseek/deepseek-r1-0528",
+    "deepseek/deepseek-r1-0528:free",
+    "openai/gpt-4.1-mini-2025-04-14"
     # 可根据需要添加更多模型
 ]
 
@@ -72,8 +76,17 @@ class NsfwNovelWriter:
     @persist_novel_state
     def design_overall(self, plot_requirements: str, writing_requirements: str):
         """
-        生成小说概要（由LLM推断语言或用户指定），并直接生成角色列表。
+        生成小说概要（先推断语言，再生成概要和角色列表）。
         """
+        # 1. 先推断语言（直接用llm.invoke）
+        inferred_language = self.model.with_retry().invoke([
+            SystemMessage(content="""
+Infer the most appropriate language for the following NSFW novel requirements. Only return the language name (e.g., Chinese, English, Japanese, etc.), do not explain.
+"""),
+            HumanMessage(content=f"{plot_requirements}\n{writing_requirements}")
+        ]).content
+
+        # 2. 再生成概要和角色列表
         system_message = SystemMessage(content=f"""
 You are a professional NSFW novel writer.
 {NSFW_OBJECTIVE}
@@ -98,6 +111,7 @@ Return your answer in the following JSON format:
         human_message = HumanMessage(content=f"""
 Plot Requirements: {plot_requirements}
 Writing Requirements: {writing_requirements}
+Language: {inferred_language}
 Design an overall plot for a NSFW novel based on the requirements above. The design should include a title, a clear and structured overview of the plot (with main storyline and key turning points), and a list of design ideas or key creative concepts. Then, based on the title and overview, design a list of main characters for the NSFW novel. For each character, return an object with name and description fields.
 """)
         llm = self.model.with_structured_output(NSFWOverallDesign, method=json_method).with_retry()
@@ -109,7 +123,7 @@ Design an overall plot for a NSFW novel based on the requirements above. The des
         self.state.writing_requirements = writing_requirements
         self.state.title = result.title
         self.state.overview = result.overview
-        self.state.language = result.language
+        self.state.language = inferred_language
         self.state.characters = result.characters
         # 初始化各角色状态（已删除 current_state）
 
@@ -162,7 +176,7 @@ Based on the above information, design a summary and a list of main plots/chapte
             system_message,
             human_message
         ])
-        self.state.chapters = [NSFWChapter(title=plot.title, overview=plot.overview, sections=[]) for plot in result.chapters]
+        self.state.chapters = [NSFWChapter(title=plot.title, overview=plot.overview, sections=self.state.chapters[idx] if idx < len(result.chapters) else []) for idx, plot in enumerate(result.chapters)]
 
     @persist_novel_state
     def design_sections(self, chapter_index: int, section_count: int | None = None, user_feedback: str | None = None):
@@ -213,34 +227,14 @@ Characters: {[{'name': c.name, 'description': c.description} for c in self.state
 Based on the above information, design a list of sections for this chapter. Each section should have a title and a brief overview, all in the specified language.
 """)
         llm = self.model.with_structured_output(NSFWSectionResponse, method=json_method).with_retry()
-        messages = [
+        result: NSFWSectionResponse = llm.invoke([
             system_message,
             human_message
-        ]
-        if user_feedback:
-            messages.append(AIMessage(content=NSFWSectionResponse(sections=chapter.sections).model_dump_json()))
-            messages.append(HumanMessage(content=user_feedback))
-
-        result: NSFWSectionResponse = llm.invoke(messages)
+        ])
         chapter.sections = [
-            NSFWSection(title=section.title, overview=section.overview, content=None)
-            for section in result.sections
+            NSFWSection(title=section.title, overview=section.overview, contenton=chapter.sections[idx].content if idx < len(chapter.sections) else None)
+            for idx, section in enumerate(result.sections)
         ]
-
-    def _get_prev_section(self, chapter_index, section_index) -> NSFWSection | None:
-        """
-        获取上一节的section对象（如有），否则返回None。
-        """
-        if section_index > 0:
-            return self.state.chapters[chapter_index].sections[section_index - 1]
-        elif chapter_index > 0 and self.state.chapters[chapter_index - 1].sections:
-            prev_chapter = self.state.chapters[chapter_index - 1]
-            return prev_chapter.sections[-1]
-        return None
-
-    def _get_prev_after_state(self, chapter_index, section_index):
-        prev_section = self._get_prev_section(chapter_index, section_index)
-        return getattr(prev_section, 'after_state', None) if prev_section else None
 
     @persist_novel_state
     def write_content(self, chapter_index: int, section_index: int, user_feedback: str | None = None) -> SectionContentResponse:
