@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "dotenv>=0.9.9",
+    "glom>=24.11.0",
     "langchain[openai]>=0.3.25",
     "langsmith>=0.3.45",
     "nicegui>=2.19.0",

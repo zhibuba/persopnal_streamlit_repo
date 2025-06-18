@@ -7,6 +7,7 @@ from langchain_openai import ChatOpenAI
 from langchain.globals import set_debug, set_verbose
 from langchain_core.callbacks.base import BaseCallbackHandler
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from glom import glom
 
 from domains import *
 from persist import persist_novel_state
@@ -176,7 +177,7 @@ Based on the above information, design a summary and a list of main plots/chapte
             system_message,
             human_message
         ])
-        self.state.chapters = [NSFWChapter(title=plot.title, overview=plot.overview, sections=self.state.chapters[idx] if idx < len(result.chapters) else []) for idx, plot in enumerate(result.chapters)]
+        self.state.chapters = [NSFWChapter(title=plot.title, overview=plot.overview, sections=glom(self.state.chapters, f'{idx}.sections', default=[]) ) for idx, plot in enumerate(result.chapters)]
 
     @persist_novel_state
     def design_sections(self, chapter_index: int, section_count: int | None = None, user_feedback: str | None = None):
@@ -227,12 +228,19 @@ Characters: {[{'name': c.name, 'description': c.description} for c in self.state
 Based on the above information, design a list of sections for this chapter. Each section should have a title and a brief overview, all in the specified language.
 """)
         llm = self.model.with_structured_output(NSFWSectionResponse, method=json_method).with_retry()
-        result: NSFWSectionResponse = llm.invoke([
+        messages = [
             system_message,
             human_message
-        ])
+        ]
+        if user_feedback:
+            # 如果有用户反馈，添加之前的章节小节内容和用户反馈
+            messages.append(AIMessage(content=NSFWSectionResponse(
+                sections=[NSFWSection(title=s.title, overview=s.overview, content=s.content) for s in chapter.sections]).model_dump_json()))
+            messages.append(HumanMessage(content=user_feedback))
+
+        result: NSFWSectionResponse = llm.invoke(messages)
         chapter.sections = [
-            NSFWSection(title=section.title, overview=section.overview, contenton=chapter.sections[idx].content if idx < len(chapter.sections) else None)
+            NSFWSection(title=section.title, overview=section.overview, content=glom(chapter.sections, f'{idx}.content', default=None))
             for idx, section in enumerate(result.sections)
         ]
 
@@ -325,12 +333,23 @@ The language must be {self.state.language}. Make the content as erotic, logical,
             messages.append(AIMessage(content=SectionContentResponse(
                 content=section.content, current_state=section.after_state).model_dump_json()))
             messages.append(HumanMessage(content=user_feedback))
-        result = llm.invoke(messages)
+        result: SectionContentResponse = llm.invoke(messages)
         section.content = result.content
         # 存储每节之后的各角色状态
         section.after_state = {k: NSFWCharacterState(**v) if not isinstance(v, NSFWCharacterState) else v for k, v in result.current_state.items()}
         return result
 
+    def _get_prev_section(self, chapter_index, section_index) -> NSFWSection | None:
+        """
+        获取上一节的section对象（如有），否则返回None。
+        """
+        if section_index > 0:
+            return self.state.chapters[chapter_index].sections[section_index - 1]
+        elif chapter_index > 0 and self.state.chapters[chapter_index - 1].sections:
+            prev_chapter = self.state.chapters[chapter_index - 1]
+            return prev_chapter.sections[-1]
+        return None
+    
     def _get_chapter_summaries(self):
         return "\n".join([
             f"- **{idx+1}. {c.title or f'Chapter {idx+1}'}**: {c.overview or ''}" for idx, c in enumerate(self.state.chapters)

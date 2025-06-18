@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import json
+from glom import glom, assign
 from nsfw import NsfwNovelWriter, MODEL_OPTIONS
 from domains import *
 from persist import get_history_page, save, delete_novel
@@ -38,6 +39,14 @@ if 'writer' not in st.session_state:
     st.session_state['writer'] = NsfwNovelWriter()
 writer: NsfwNovelWriter = st.session_state['writer']
 state = writer.state
+
+def bind_state(path: str):
+    key = f'state.{path}'
+    return {
+        'value': glom(state, path, default=None),
+        'key': key,
+        'on_change': lambda: assign(state, path, st.session_state[key]),
+    }
 
 def rerun():
     if state.plot_requirements or state.title or state.overview or state.language or state.characters:
@@ -151,28 +160,24 @@ if st.session_state.get('show_delete_confirm', False):
     delete_confirm_dialog()
 
 # 需求输入
-plot_requirements = st.text_area(
+st.text_area(
     "你想要怎样的情节（情节要求）",
-    height=100,
-    value=state.plot_requirements or "",
-    key="plot_requirements_input"
+    height=80,
+    **bind_state("plot_requirements")
 )
-state.plot_requirements = plot_requirements
 
-writing_requirements = st.text_area(
+st.text_area(
     "你对小说创作有哪些要求（写作要求）",
     height=80,
-    value=state.writing_requirements or "",
-    key="writing_requirements_input"
+    **bind_state("writing_requirements")
 )
-state.writing_requirements = writing_requirements
 
 # 生成/重置按钮同一行
 col_gen, col_reset = st.columns(2)
 with col_gen:
     if st.button("生成小说概要"):
-        if plot_requirements.strip():
-            writer.design_overall(plot_requirements, writing_requirements)
+        if state.plot_requirements:
+            writer.design_overall(state.plot_requirements, state.writing_requirements)
             st.success("生成成功！")
         else:
             st.warning("请输入情节要求后再生成。")
@@ -182,45 +187,39 @@ with col_reset:
         st.success("已重置所有内容！")
         rerun()
 
-
 # 标题和概要编辑
 if state.title is not None:
-    title = st.text_input("小说标题：", value=state.title or "", key="title_input")
-    overall = st.text_area("小说概要：", value=state.overview or "", key="overview_input")
-    state.title = title
-    state.overview = overall
+    st.text_input("小说标题：", **bind_state("title"))
+    st.text_area("小说概要：", **bind_state("overview"))
     st.subheader("角色列表：")
     # 角色展示、编辑、删除
     remove_idx = None
     for idx, character in enumerate(state.characters):
         col1, col2, col3 = st.columns([4, 8, 2])
         with col1:
-            edited_name = st.text_input(f"角色名{idx+1}", value=character.name, key=f"character_name_{idx}")
+            st.text_input(f"角色名{idx+1}", **bind_state(f"characters.{idx}.name"))
         with col2:
-            edited_desc = st.text_input(f"角色描述{idx+1}", value=character.description, key=f"character_desc_{idx}")
+            st.text_input(f"角色描述{idx+1}", **bind_state(f"characters.{idx}.description"))
         with col3:
             if st.button("删除", key=f"remove_character_{idx}"):
                 remove_idx = idx
-        # 写回编辑
-        state.characters[idx].name = edited_name
-        state.characters[idx].description = edited_desc
     if remove_idx is not None:
         del state.characters[remove_idx]
         rerun()
     # 增加角色（同一行，on_click清空输入）
     def _add_character_inputs():
         from domains import NSFWCharacter
-        if new_char_name.strip():
-            state.characters.append(NSFWCharacter(name=new_char_name, description=new_char_desc))
+        if st.session_state["add_character_name"].strip():
+            state.characters.append(NSFWCharacter(name=st.session_state["add_character_name"], description=st.session_state["add_character_desc"]))
             st.session_state["add_character_name"] = ""
             st.session_state["add_character_desc"] = ""
     coln1, coln2, coln3 = st.columns([4, 8, 2])
     with coln1:
-        new_char_name = st.text_input("新增角色名", value="", key="add_character_name")
+        st.text_input("新增角色名", value="", key="add_character_name")
     with coln2:
-        new_char_desc = st.text_input("新增角色描述", value="", key="add_character_desc")
+        st.text_input("新增角色描述", value="", key="add_character_desc")
     with coln3:
-        add_char_clicked = st.button("添加角色", key="add_character_btn", on_click=_add_character_inputs)
+        st.button("添加角色", key="add_character_btn", on_click=_add_character_inputs)
 
     # 章节编辑区域
 @st.fragment
@@ -235,17 +234,15 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
         if st.button(f"删除本章", key=f"delete_chapter_{idx}"):
             del writer.state.chapters[idx]
             rerun()
-    chapter_title = st.text_input(f"第{idx+1}章标题", value=chapter.title or f"第{idx+1}章", key=f"chapter_title_{idx}")
-    chapter_overview = st.text_area(f"第{idx+1}章概要", value=chapter.overview or "", key=f"chapter_overview_{idx}")
-    chapter.title = chapter_title
-    chapter.overview = chapter_overview
+    st.text_input(f"第{idx+1}章标题", **bind_state(f"chapters.{idx}.title"))
+    st.text_area(f"第{idx+1}章概要", **bind_state(f"chapters.{idx}.overview"))
     col_sec1, col_sec2, col_sec3 = st.columns([2,2,2])
     with col_sec1:
         section_count = st.selectbox(f"节数量", options=["AUTO"] + [str(i) for i in range(1, 21)], index=0, key=f"section_count_{idx}")
     with col_sec2:
         if st.button(f"生成节概要", key=f"gen_sections_{idx}"):
             writer.design_sections(idx, section_count=None if section_count=="AUTO" else int(section_count))
-            st.success(f"已为{chapter_title}生成节！")
+            st.success(f"已为{chapter.title}生成节！")
             rerun()
     with col_sec3:
         if st.button(f"一键生成本章", key=f"oneclick_gen_{idx}"):
@@ -264,15 +261,13 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
     for sidx, section in enumerate(chapter.sections):
         col_secA, col_secB = st.columns([4, 8])
         with col_secA:
-            sec_title = st.text_input(f"第{idx+1}章第{sidx+1}节标题", value=section.title or "", key=f"section_title_{idx}_{sidx}")
+            st.text_input(f"第{idx+1}章第{sidx+1}节标题", **bind_state(f"chapters.{idx}.sections.{sidx}.title"))
         with col_secB:
-            sec_overview = st.text_area(f"第{idx+1}章第{sidx+1}节概要", value=section.overview or "", key=f"section_overview_{idx}_{sidx}", height=150)
+            st.text_area(f"第{idx+1}章第{sidx+1}节概要", **bind_state(f"chapters.{idx}.sections.{sidx}.overview"), height=150)
         if st.button(f"生成第{idx+1}章第{sidx+1}节正文", key=f"gen_content_{idx}_{sidx}"):
             writer.write_content(idx, sidx)
             st.success(f"已为第{idx+1}章第{sidx+1}节生成正文！")
             rerun()
-        section.title = sec_title
-        section.overview = sec_overview
         if section.content:
             col_fb_1, col_fb_2 = st.columns([6, 2])
             with col_fb_1:
@@ -281,14 +276,11 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
                 if st.button('提交反馈', key=f'feedback_button_{idx}_{sidx}'):
                     writer.write_content(idx, sidx, user_feedback=feedback)
                     rerun()
-        if section.content is not None:
-            sec_content = st.text_area(
+            st.text_area(
                 f"第{idx+1}章第{sidx+1}节内容",
-                value=section.content,
-                key=f"section_content_{idx}_{sidx}",
+                **bind_state(f"chapters.{idx}.sections.{sidx}.content"),
                 height=500
             )
-            section.content = sec_content
         col_sec_add, col_sec_del = st.columns([2,2])
         with col_sec_add:
             if st.button(f"添加下一节", key=f"add_section_after_{idx}_{sidx}"):
@@ -300,14 +292,11 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
                 rerun()
         if section.after_state:
             with st.expander("本节后角色状态", expanded=False):
-                for cname, cstate in section.after_state.items():
+                for cname in section.after_state:
                     st.markdown(f"**{cname}**")
-                    clothing = st.text_input(f"衣着状态", value=getattr(cstate, 'clothing', ''), key=f"afterstate_clothing_{idx}_{sidx}_{cname}")
-                    psychological = st.text_area(f"心理状态", value=getattr(cstate, 'psychological', ''), key=f"afterstate_psy_{idx}_{sidx}_{cname}")
-                    physiological = st.text_area(f"生理状态", value=getattr(cstate, 'physiological', ''), key=f"afterstate_phy_{idx}_{sidx}_{cname}")
-                    cstate.clothing = clothing
-                    cstate.psychological = psychological
-                    cstate.physiological = physiological
+                    st.text_input(f"衣着状态", **bind_state(f"chapters.{idx}.sections.{sidx}.after_state.{cname}.clothing"))
+                    st.text_area(f"心理状态", **bind_state(f"chapters.{idx}.sections.{sidx}.after_state.{cname}.psychological"))
+                    st.text_area(f"生理状态", **bind_state(f"chapters.{idx}.sections.{sidx}.after_state.{cname}.physiological"))
 
 def chapter_area():
     col_ch1, col_ch2, col_ch3 = st.columns([2,2,2])
@@ -339,8 +328,8 @@ def chapter_area():
             with tab:
                 single_chapter_area(idx, chapter)
                 
-
-chapter_area()
+if state.overview:
+    chapter_area()
 
 
 
