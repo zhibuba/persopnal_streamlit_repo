@@ -65,12 +65,18 @@ class NsfwNovelWriter:
             base_url="https://openrouter.ai/api/v1",
             callbacks=[LLMLoggingCallbackHandler()],
             model_kwargs={
-                "extra_body": {"safety_settings": [
-                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                ]}
+                "extra_body": {
+                    "safety_settings": [
+                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                    ],
+                    "provider": {
+                        "order": ["google-vertex"]
+                    }       
+                },
+                
             }
         )
 

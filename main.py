@@ -41,7 +41,7 @@ writer: NsfwNovelWriter = st.session_state['writer']
 state = writer.state
 
 def bind_state(path: str):
-    key = f'state.{path}'
+    key = f'state#{path}'
     return {
         'value': glom(state, path, default=None),
         'key': key,
@@ -160,7 +160,7 @@ if st.session_state.get('show_delete_confirm', False):
     delete_confirm_dialog()
 
 # 需求输入
-st.text_area(
+v = st.text_area(
     "你想要怎样的情节（情节要求）",
     height=80,
     **bind_state("plot_requirements")
