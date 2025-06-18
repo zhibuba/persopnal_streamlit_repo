@@ -64,19 +64,16 @@ class NsfwNovelWriter:
             model=model_name,
             base_url="https://openrouter.ai/api/v1",
             callbacks=[LLMLoggingCallbackHandler()],
-            model_kwargs={
-                "extra_body": {
-                    "safety_settings": [
-                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                    ],
-                    "provider": {
-                        "order": ["google-vertex"]
-                    }       
-                },
-                
+            extra_body= {
+                "safety_settings": [
+                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                ],
+                "provider": {
+                    "order": ["google-vertex"]
+                }       
             }
         )
 
@@ -246,7 +243,7 @@ Based on the above information, design a list of sections for this chapter. Each
 
         result: NSFWSectionResponse = llm.invoke(messages)
         chapter.sections = [
-            NSFWSection(title=section.title, overview=section.overview, content=glom(chapter.sections, f'{idx}.content', default=None))
+            NSFWSection(title=section.title, overview=section.overview, content=glom(chapter.sections, f'{idx}.content', default=None), after_state=glom(chapter.sections, f'{idx}.after_state', default={}))
             for idx, section in enumerate(result.sections)
         ]
 

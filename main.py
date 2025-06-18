@@ -88,11 +88,15 @@ with col_import:
             except Exception as e:
                 st.error(f"导入失败: {e}")
 with col_md:
-    if st.button('导出为Markdown'):
+    if st.button('生成Markdown'):
         writer.export_markdown()
         st.success('已生成导出文件！')
     if state.exported_markdown:
-        st.download_button('下载导出Markdown', data=state.exported_markdown, file_name=f"{state.title or 'NSFW小说'}.md", mime='text/markdown')
+        @st.dialog("预览Markdown", width="large")
+        def preview_markdown_dialog():
+            st.markdown(state.exported_markdown)
+        st.button("预览Markdown", on_click=preview_markdown_dialog)
+        st.download_button('下载Markdown', data=state.exported_markdown, file_name=f"{state.title or 'NSFW小说'}.md", mime='text/markdown')
 
 @st.dialog("历史记录", width="large")
 def history_dialog():
@@ -160,7 +164,7 @@ if st.session_state.get('show_delete_confirm', False):
     delete_confirm_dialog()
 
 # 需求输入
-v = st.text_area(
+st.text_area(
     "你想要怎样的情节（情节要求）",
     height=80,
     **bind_state("plot_requirements")
