@@ -86,7 +86,7 @@ class NsfwNovelWriter:
         # 1. 先推断语言（直接用llm.invoke）
         inferred_language = self.model.with_retry().invoke([
             SystemMessage(content="""
-Infer the most appropriate language for the following NSFW novel requirements. Only return the language name (e.g., Chinese, English, Japanese, etc.), do not explain.
+Determine the language for the following NSFW novel requirements.If the requirements do not specify a language, use the language in what the requirements written. Otherwise, use the language specified by the requirements. Only return the language name (e.g., Chinese, English, Japanese, etc.), do not explain.
 """),
             HumanMessage(content=f"{plot_requirements}\n{writing_requirements}")
         ]).content
@@ -321,7 +321,7 @@ Return your answer in the following JSON format:
 ## User Writing Requirements
 {self.state.writing_requirements}
 
-{'**Previous Section Content:**\n' + prev_content if prev_content else ''}
+{'## Previous Section Content (continue writing following but not repeating it)\n' + prev_content if prev_content else ''}
 
 ---
 
