@@ -32,7 +32,8 @@ def oneclick_generate_chapter(writer: NsfwNovelWriter, idx, section_count=None, 
     for sidx in range(total):
         if progress_placeholder:
             progress_placeholder.info(f"正在生成第{idx+1}章{chapters_progress}第{sidx+1}节正文（{sidx+1}/{total}）...")
-        writer.write_content(idx, sidx)
+        for _ in writer.write_content(idx, sidx):
+            pass
 
 # 初始化/恢复 writer
 if 'writer' not in st.session_state:
@@ -269,21 +270,27 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
             st.text_input(f"第{idx+1}章第{sidx+1}节标题", **bind_state(f"chapters.{idx}.sections.{sidx}.title"))
         with col_secB:
             st.text_area(f"第{idx+1}章第{sidx+1}节概要", **bind_state(f"chapters.{idx}.sections.{sidx}.overview"), height=150)
+        to_generate = False
+        user_feedback = None
         if st.button(f"生成第{idx+1}章第{sidx+1}节正文", key=f"gen_content_{idx}_{sidx}"):
-            with st.empty():
-                for partial in writer.write_content(idx, sidx):
-                    st.write(partial)
-            rerun()
+            to_generate = True
+    
         if section.content:
             col_fb_1, col_fb_2 = st.columns([6, 2])
             with col_fb_1:
                 feedback = st.text_input(f'第{idx+1}章第{sidx+1}节正文反馈', key=f'feedback_input_{idx}_{sidx}')
             with col_fb_2:
                 if st.button('提交反馈', key=f'feedback_button_{idx}_{sidx}'):
-                    with st.empty():
-                        for partial in writer.write_content(idx, sidx, user_feedback=feedback):
-                            st.write(partial)
-                    rerun()
+                    to_generate = True
+                    user_feedback = feedback
+                    
+        if to_generate:
+            with st.empty():
+                for partial in writer.write_content(idx, sidx, user_feedback=user_feedback):
+                    st.write(partial)
+            rerun()
+            
+        if section.content:
             st.text_area(
                 f"第{idx+1}章第{sidx+1}节内容",
                 **bind_state(f"chapters.{idx}.sections.{sidx}.content"),
@@ -302,7 +309,7 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
             with st.expander("本节后角色状态", expanded=False):
                 for cname in section.after_state:
                     st.markdown(f"**{cname}**")
-                    st.text_input(f"衣着状态", **bind_state(f"chapters.{idx}.sections.{sidx}.after_state.{cname}.clothing"))
+                    st.text_area(f"衣着状态", **bind_state(f"chapters.{idx}.sections.{sidx}.after_state.{cname}.clothing"))
                     st.text_area(f"心理状态", **bind_state(f"chapters.{idx}.sections.{sidx}.after_state.{cname}.psychological"))
                     st.text_area(f"生理状态", **bind_state(f"chapters.{idx}.sections.{sidx}.after_state.{cname}.physiological"))
 

@@ -343,7 +343,7 @@ The language must be {self.state.language}. Make the content as erotic, logical,
             result = streamed
             yield streamed['content']
         section.content = result['content']
-        section.after_state = {k: NSFWCharacterState(**v) if not isinstance(v, NSFWCharacterState) else v for k, v in result['current_state'].items()}
+        section.after_state = {k: NSFWCharacterState(**v) for k, v in result.get('current_state', {}).items()}
 
     def _get_prev_section(self, chapter_index, section_index) -> NSFWSection | None:
         """
