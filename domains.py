@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, RootModel
+from typing import TypedDict, Annotated
 import uuid
 
 class NSFWCharacter(BaseModel):
@@ -61,7 +62,6 @@ class NSFWChapterResponse(BaseModel):
 class NSFWOverallDesign(BaseModel):
     title: str | None = Field(default=None, description="The title of the NSFW novel.")
     overview: str | None = Field(default=None, description="A brief overview of the NSFW novel's plot.")  
-    language: str | None = Field(default=None, description="The language of the NSFW novel.")
     characters: list[NSFWCharacter] = Field(default_factory=list, description="A list of main characters, each as an object with name and description.")
     
 class NSFWNovel(BaseModel):
@@ -90,4 +90,8 @@ class ListModel[T](RootModel[T]):
 
 class SectionContentResponse(BaseModel):
     content: str = Field(..., description="The generated content for the section.")
-    current_state: dict = Field(..., description="The updated state for each character after this section.")
+    current_state: dict[str, NSFWCharacterState] = Field(..., description="The updated state for each character after this section.")
+    
+class SectionContentDict(TypedDict):
+    content: Annotated[str, ..., Field(description="The generated content for the section.")]
+    current_state: Annotated[dict[str, dict], ..., Field(description="The updated state for each character after this section.")]

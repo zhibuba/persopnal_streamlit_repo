@@ -3,9 +3,10 @@ import logging
 
 dotenv.load_dotenv()
 
+from typing import Generator
 from langchain_openai import ChatOpenAI
 from langchain.globals import set_debug, set_verbose
-from langchain_core.callbacks.base import BaseCallbackHandler
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from glom import glom
 
@@ -107,7 +108,6 @@ Return your answer in the following JSON format:
 {{
   "title": "The title of the NSFW novel",
   "overview": "A clear, structured overview of the NSFW novel's main plot, from start to finish, with key stages and turning points, and a list of design ideas.",
-  "language": "The language of the NSFW novel",
   "characters": [{{"name": "the name of the character", "description": "the description and role"}}, ...]
 }}
 ```
@@ -115,7 +115,7 @@ Return your answer in the following JSON format:
         human_message = HumanMessage(content=f"""
 Plot Requirements: {plot_requirements}
 Writing Requirements: {writing_requirements}
-Language: {inferred_language}
+Language you will use: {inferred_language}
 Design an overall plot for a NSFW novel based on the requirements above. The design should include a title, a clear and structured overview of the plot (with main storyline and key turning points), and a list of design ideas or key creative concepts. Then, based on the title and overview, design a list of main characters for the NSFW novel. For each character, return an object with name and description fields.
 """)
         llm = self.model.with_structured_output(NSFWOverallDesign, method=json_method).with_retry()
@@ -248,9 +248,9 @@ Based on the above information, design a list of sections for this chapter. Each
         ]
 
     @persist_novel_state
-    def write_content(self, chapter_index: int, section_index: int, user_feedback: str | None = None) -> SectionContentResponse:
+    def write_content(self, chapter_index: int, section_index: int, user_feedback: str | None = None) -> Generator[str, None, None]:
         """
-        Generate the content for the specified chapter and section, and return a SectionContentResponse.
+        Generate the content for the specified chapter and section, yielding the content as a generator of strings.
         If this is the first section of the chapter and there is a previous chapter, pass the last section content of the previous chapter as context.
         The prompt uses markdown structure, and all instructions are in English. The current chapter and section overview are included in the final instruction paragraph.
         LLM should return a JSON object: {"content": "...", "current_state": {character_name: {state_info}}}
@@ -327,7 +327,7 @@ Return your answer in the following JSON format:
 
 The language must be {self.state.language}. Make the content as erotic, logical, and interesting as possible.\n\nCurrent chapter overview: {chapter.overview}\nCurrent section overview: {section.overview}\n.
 """)
-        llm = self.model.with_structured_output(SectionContentResponse, method=json_method).with_retry()
+        llm = self.model.with_structured_output(SectionContentDict, method=json_method).with_retry()
         messages= [
             system_message,
             human_message
@@ -336,11 +336,14 @@ The language must be {self.state.language}. Make the content as erotic, logical,
             messages.append(AIMessage(content=SectionContentResponse(
                 content=section.content, current_state=section.after_state).model_dump_json()))
             messages.append(HumanMessage(content=user_feedback))
-        result: SectionContentResponse = llm.invoke(messages)
-        section.content = result.content
-        # 存储每节之后的各角色状态
-        section.after_state = {k: NSFWCharacterState(**v) if not isinstance(v, NSFWCharacterState) else v for k, v in result.current_state.items()}
-        return result
+        result: SectionContentDict = {}
+        for streamed in llm.stream(messages):
+            if 'content' not in streamed:
+                continue
+            result = streamed
+            yield streamed['content']
+        section.content = result['content']
+        section.after_state = {k: NSFWCharacterState(**v) if not isinstance(v, NSFWCharacterState) else v for k, v in result['current_state'].items()}
 
     def _get_prev_section(self, chapter_index, section_index) -> NSFWSection | None:
         """

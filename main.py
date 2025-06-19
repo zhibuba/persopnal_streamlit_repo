@@ -194,16 +194,17 @@ with col_reset:
 # 标题和概要编辑
 if state.title is not None:
     st.text_input("小说标题：", **bind_state("title"))
-    st.text_area("小说概要：", **bind_state("overview"))
+    st.text_area("小说概要：", **bind_state("overview"), height=
+                 250)
     st.subheader("角色列表：")
     # 角色展示、编辑、删除
     remove_idx = None
     for idx, character in enumerate(state.characters):
-        col1, col2, col3 = st.columns([4, 8, 2])
+        col1, col2, col3 = st.columns([3, 8, 2])
         with col1:
             st.text_input(f"角色名{idx+1}", **bind_state(f"characters.{idx}.name"))
         with col2:
-            st.text_input(f"角色描述{idx+1}", **bind_state(f"characters.{idx}.description"))
+            st.text_area(f"角色描述{idx+1}", **bind_state(f"characters.{idx}.description"))
         with col3:
             if st.button("删除", key=f"remove_character_{idx}"):
                 remove_idx = idx
@@ -217,11 +218,11 @@ if state.title is not None:
             state.characters.append(NSFWCharacter(name=st.session_state["add_character_name"], description=st.session_state["add_character_desc"]))
             st.session_state["add_character_name"] = ""
             st.session_state["add_character_desc"] = ""
-    coln1, coln2, coln3 = st.columns([4, 8, 2])
+    coln1, coln2, coln3 = st.columns([3, 8, 2])
     with coln1:
         st.text_input("新增角色名", value="", key="add_character_name")
     with coln2:
-        st.text_input("新增角色描述", value="", key="add_character_desc")
+        st.text_area("新增角色描述", value="", key="add_character_desc")
     with coln3:
         st.button("添加角色", key="add_character_btn", on_click=_add_character_inputs)
 
@@ -239,7 +240,7 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
             del writer.state.chapters[idx]
             rerun()
     st.text_input(f"第{idx+1}章标题", **bind_state(f"chapters.{idx}.title"))
-    st.text_area(f"第{idx+1}章概要", **bind_state(f"chapters.{idx}.overview"))
+    st.text_area(f"第{idx+1}章概要", **bind_state(f"chapters.{idx}.overview"), height=200)
     col_sec1, col_sec2, col_sec3 = st.columns([2,2,2])
     with col_sec1:
         section_count = st.selectbox(f"节数量", options=["AUTO"] + [str(i) for i in range(1, 21)], index=0, key=f"section_count_{idx}")
@@ -269,8 +270,9 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
         with col_secB:
             st.text_area(f"第{idx+1}章第{sidx+1}节概要", **bind_state(f"chapters.{idx}.sections.{sidx}.overview"), height=150)
         if st.button(f"生成第{idx+1}章第{sidx+1}节正文", key=f"gen_content_{idx}_{sidx}"):
-            writer.write_content(idx, sidx)
-            st.success(f"已为第{idx+1}章第{sidx+1}节生成正文！")
+            with st.empty():
+                for partial in writer.write_content(idx, sidx):
+                    st.write(partial)
             rerun()
         if section.content:
             col_fb_1, col_fb_2 = st.columns([6, 2])
@@ -278,7 +280,9 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
                 feedback = st.text_input(f'第{idx+1}章第{sidx+1}节正文反馈', key=f'feedback_input_{idx}_{sidx}')
             with col_fb_2:
                 if st.button('提交反馈', key=f'feedback_button_{idx}_{sidx}'):
-                    writer.write_content(idx, sidx, user_feedback=feedback)
+                    with st.empty():
+                        for partial in writer.write_content(idx, sidx, user_feedback=feedback):
+                            st.write(partial)
                     rerun()
             st.text_area(
                 f"第{idx+1}章第{sidx+1}节内容",
