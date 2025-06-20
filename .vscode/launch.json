@@ -14,13 +14,24 @@
         },
 
         {
-            "name": "debug streamlit",
+            "name": "debug streamlit nsfw",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/.venv/Scripts/streamlit.exe",
             "args": [
                 "run",
-                "main.py"
+                "nsfw/ui.py"
+            ]
+        },
+
+        {
+            "name": "debug streamlit translator",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/.venv/Scripts/streamlit.exe",
+            "args": [
+                "run",
+                "translator/ui.py"
             ]
         }
 ]

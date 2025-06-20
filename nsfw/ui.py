@@ -290,7 +290,7 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
             with st.empty():
                 for partial in writer.write_content(idx, sidx, user_feedback=user_feedback):
                     st.write(partial)
-            #rerun()
+                st.write('')
             
         if section.content:
             if st.session_state.get("edit_content_checkbox", True):
