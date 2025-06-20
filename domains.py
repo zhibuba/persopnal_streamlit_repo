@@ -12,29 +12,6 @@ class NSFWPlot(BaseModel):
     overview: str | None = Field(default=None, description="A brief overview of the plot.")
 
 
-class NSFWPlots(BaseModel):
-    title: str | None = Field(default=None, description="The title of the NSFW plots.")
-    summary: str | None = Field(default=None, description="A summary of the NSFW plots."),
-    plots: list[NSFWPlot] = Field(..., description="A list of NSFW plots.")
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "summary": "这是一个NSFW情节的总结，包含多个情节设计。",
-                "plots": [
-                    {
-                        "title": "情节标题1",
-                        "overview": "情节概述1"
-                    },
-                    {
-                        "title": "情节标题2",
-                        "overview": "情节概述2"
-                    }
-                ]
-            }
-        }
-
-
 class NSFWCharacterState(BaseModel):
     clothing: str = Field(..., description="The clothing state of the character after this section.")
     psychological: str = Field(..., description="The psychological state of the character after this section.")
@@ -54,10 +31,10 @@ class NSFWChapter(BaseModel):
     
     
 class NSFWSectionResponse(BaseModel):
-     sections: list[NSFWSection] = Field(default_factory=list, description="A list of NSFW sections.")
+     sections: list[NSFWPlot] = Field(default_factory=list, description="A list of NSFW sections.")
     
 class NSFWChapterResponse(BaseModel):
-     chapters: list[NSFWChapter] = Field(default_factory=list, description="A list of NSFW chapters.")
+     chapters: list[NSFWPlot] = Field(default_factory=list, description="A list of NSFW chapters.")
  
 class NSFWOverallDesign(BaseModel):
     title: str | None = Field(default=None, description="The title of the NSFW novel.")

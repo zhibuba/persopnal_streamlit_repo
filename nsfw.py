@@ -132,10 +132,11 @@ Design an overall plot for a NSFW novel based on the requirements above. The des
         # 初始化各角色状态（已删除 current_state）
 
     @persist_novel_state
-    def design_chapters(self, chapter_count=None):
+    def design_chapters(self, chapter_count=None, user_feedback: str | None = None):
         """
         根据小说的标题、概要、语言、角色生成章概要(NSFWPlots)，并更新state.chapters。
         可指定章数，若为None则自动。
+        支持用户反馈。
         """
         system_message = SystemMessage(content=f"""
 You are a professional NSFW novel writer.
@@ -176,10 +177,17 @@ Writing Requirements: {self.state.writing_requirements}
 Based on the above information, design a summary and a list of main plots/chapters for the NSFW novel. Return a JSON object with a `chapters` field containing the list of chapters, each with a title and overview, all in the specified language.
 """)
         llm = self.model.with_structured_output(NSFWChapterResponse, method=json_method).with_retry()
-        result: NSFWChapterResponse = llm.invoke([
+        messages = [
             system_message,
             human_message
-        ])
+        ]
+        if user_feedback:
+            # 如果有用户反馈，添加之前的章节内容和用户反馈
+            messages.append(AIMessage(content=NSFWChapterResponse(
+                chapters=[NSFWPlot(title=c.title, overview=c.overview) for c in self.state.chapters]).model_dump_json()))
+            messages.append(HumanMessage(content=user_feedback))
+
+        result: NSFWChapterResponse = llm.invoke(messages)
         self.state.chapters = [NSFWChapter(title=plot.title, overview=plot.overview, sections=glom(self.state.chapters, f'{idx}.sections', default=[]) ) for idx, plot in enumerate(result.chapters)]
 
     @persist_novel_state
@@ -238,7 +246,7 @@ Based on the above information, design a list of sections for this chapter. Each
         if user_feedback:
             # 如果有用户反馈，添加之前的章节小节内容和用户反馈
             messages.append(AIMessage(content=NSFWSectionResponse(
-                sections=[NSFWSection(title=s.title, overview=s.overview, content=s.content) for s in chapter.sections]).model_dump_json()))
+                sections=[NSFWPlot(title=s.title, overview=s.overview) for s in chapter.sections]).model_dump_json()))
             messages.append(HumanMessage(content=user_feedback))
 
         result: NSFWSectionResponse = llm.invoke(messages)

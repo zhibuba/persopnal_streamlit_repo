@@ -49,10 +49,10 @@ def bind_state(path: str):
         'on_change': lambda: assign(state, path, st.session_state[key]),
     }
 
-def rerun():
+def rerun(partial: bool = False):
     if state.plot_requirements or state.title or state.overview or state.language or state.characters:
         save(state)
-    st.rerun()
+    st.rerun(scope="app" if not partial else "fragment")
 
 # 导出/导入/导出Markdown同一行
 model_choice = st.selectbox("选择模型", options=MODEL_OPTIONS, index=0, key="model_select")
@@ -178,7 +178,7 @@ st.text_area(
 )
 
 # 生成/重置按钮同一行
-col_gen, col_reset = st.columns(2)
+col_gen, col_reset, col_edit_content = st.columns([1,1,2])
 with col_gen:
     if st.button("生成小说概要"):
         if state.plot_requirements:
@@ -191,6 +191,8 @@ with col_reset:
         st.session_state['writer'] = NsfwNovelWriter()
         st.success("已重置所有内容！")
         rerun()
+with col_edit_content:
+    edit_content = st.checkbox("编辑正文", value=False, key="edit_content_checkbox")
 
 # 标题和概要编辑
 if state.title is not None:
@@ -249,13 +251,13 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
         if st.button(f"生成节概要", key=f"gen_sections_{idx}"):
             writer.design_sections(idx, section_count=None if section_count=="AUTO" else int(section_count))
             st.success(f"已为{chapter.title}生成节！")
-            rerun()
+            #rerun()
     with col_sec3:
         if st.button(f"一键生成本章", key=f"oneclick_gen_{idx}"):
             progress_placeholder = st.empty()
             oneclick_generate_chapter(writer, idx, section_count=None if section_count=="AUTO" else int(section_count), progress_placeholder=progress_placeholder)
             progress_placeholder.success(f"已为第{idx+1}章一键生成所有节概要和正文！")
-            rerun()
+            #rerun()
     if chapter.sections:
         col_fb_1, col_fb_2 = st.columns([6, 2])
         with col_fb_1:
@@ -263,7 +265,7 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
         with col_fb_2:
             if st.button('提交反馈', key=f'feedback_button_{idx}'):
                 writer.design_sections(idx, user_feedback=feedback)
-                rerun()
+                #rerun()
     for sidx, section in enumerate(chapter.sections):
         col_secA, col_secB = st.columns([4, 8])
         with col_secA:
@@ -288,23 +290,26 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
             with st.empty():
                 for partial in writer.write_content(idx, sidx, user_feedback=user_feedback):
                     st.write(partial)
-            rerun()
+            #rerun()
             
         if section.content:
-            st.text_area(
-                f"第{idx+1}章第{sidx+1}节内容",
-                **bind_state(f"chapters.{idx}.sections.{sidx}.content"),
-                height=500
-            )
+            if st.session_state.get("edit_content_checkbox", True):
+                st.text_area(
+                    f"第{idx+1}章第{sidx+1}节内容",
+                    **bind_state(f"chapters.{idx}.sections.{sidx}.content"),
+                    height=500
+                )
+            else:
+                st.write(section.content)
         col_sec_add, col_sec_del = st.columns([2,2])
         with col_sec_add:
             if st.button(f"添加下一节", key=f"add_section_after_{idx}_{sidx}"):
                 chapter.sections.insert(sidx+1, NSFWSection(title="", overview="", content=None))
-                rerun()
+                rerun(partial=True)
         with col_sec_del:
             if st.button(f"删除本节", key=f"delete_section_{idx}_{sidx}"):
                 del chapter.sections[sidx]
-                rerun()
+                rerun(partial=True)
         if section.after_state:
             with st.expander("本节后角色状态", expanded=False):
                 for cname in section.after_state:
@@ -337,6 +342,14 @@ def chapter_area():
             progress_placeholder.success("已为所有章节一键生成概要和正文！")
             rerun()
     if state.chapters:
+        # 章概要反馈输入框和按钮，放在所有tab上方
+        col_ch_fb_1, col_ch_fb_2 = st.columns([6, 2])
+        with col_ch_fb_1:
+            chapter_feedback = st.text_input('各章概要反馈', key='chapter_feedback_input')
+        with col_ch_fb_2:
+            if st.button('提交章概要反馈', key='chapter_feedback_button'):
+                writer.design_chapters(user_feedback=chapter_feedback)
+                rerun()
         tab_titles = [chapter.title or f"第{idx+1}章" for idx, chapter in enumerate(state.chapters)]
         tabs = st.tabs(tab_titles)
         for idx, (chapter, tab) in enumerate(zip(state.chapters, tabs)):
