@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import json
 from glom import glom, assign
-from nsfw import NsfwNovelWriter, MODEL_OPTIONS
+from core import NsfwNovelWriter, MODEL_OPTIONS
 from domains import *
 from persist import get_history_page, save, delete_novel
 

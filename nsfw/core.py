@@ -285,7 +285,7 @@ You are writing the full content for a single section of the novel. You must upd
 **Content Formatting Requirements:**
 - Write the full content for the current section only (do not include section or chapter titles)
 - The content must be clearly and reasonably divided into natural paragraphs, with each paragraph separated by a blank line.
-- Do not include any special characters to replace or divide words related to NSFW content.
+- Do not include any special characters or pinyin to replace or divide words related to NSFW content.
 
 **Characters State Updating Requirement:**
 - In the returned JSON, the `current_state` for each character must include their clothing state, psychological state, and physiological state after the events of this section.
