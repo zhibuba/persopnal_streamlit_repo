@@ -25,7 +25,11 @@ mode_col, btn_col = st.columns([3, 1])
 with mode_col:
     mode = st.radio("选择翻译模式", ["流式翻译", "并行翻译"], horizontal=True)
 with btn_col:
-    translate_clicked = st.button("翻译", use_container_width=True)
+    translate_clicked = st.button(
+        label="🚀 **开始翻译**",
+        use_container_width=True,
+        help="点击此按钮开始翻译文本"
+    )
 
 text = ""
 title = ""

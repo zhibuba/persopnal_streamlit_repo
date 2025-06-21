@@ -81,13 +81,23 @@ with col_import:
         if st.button("应用导入内容"):
             try:
                 st.session_state['writer'] = NsfwNovelWriter()
-                st.session_state['writer'].state = NSFWNovel.model_validate(st.session_state['import_json_data'])
+                st.session_state['writer'].state = NSFWNovel.model_validate(st.session_state['import_json_data'], strict=False)
                 st.success("导入成功！")
                 st.session_state.pop("import_json_uploader", None)
                 st.session_state.pop("import_json_data", None)
                 rerun()
             except Exception as e:
-                st.error(f"导入失败: {e}")
+                # 尝试兼容旧数据
+                try:
+                    from domains import clean_legacy_nsfw_novel_json
+                    data = clean_legacy_nsfw_novel_json(st.session_state['import_json_data'])
+                    st.session_state['writer'].state = NSFWNovel.model_validate(data, strict=False)
+                    st.success("检测到旧数据格式，已自动兼容并导入！")
+                    st.session_state.pop("import_json_uploader", None)
+                    st.session_state.pop("import_json_data", None)
+                    rerun()
+                except Exception as e2:
+                    st.error(f"导入失败: {e}\n兼容旧数据也失败: {e2}")
 with col_md:
     if st.button('生成Markdown'):
         writer.export_markdown()
@@ -290,7 +300,7 @@ def single_chapter_area(idx: int, chapter: NSFWChapter):
             with st.empty():
                 for partial in writer.write_content(idx, sidx, user_feedback=user_feedback):
                     st.write(partial)
-                st.write('')
+                rerun(partial=True)
             
         if section.content:
             if st.session_state.get("edit_content_checkbox", True):

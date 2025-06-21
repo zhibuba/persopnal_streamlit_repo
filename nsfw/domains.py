@@ -72,3 +72,16 @@ class SectionContentResponse(BaseModel):
 class SectionContentDict(TypedDict):
     content: Annotated[str, ..., Field(description="The generated content for the section.")]
     current_state: Annotated[dict[str, dict], ..., Field(description="The updated state for each character after this section.")]
+
+# 兼容旧NSFWNovel JSON数据，递归删除sections下的current_state字段（直接循环实现）
+def clean_legacy_nsfw_novel_json(data: dict) -> dict:
+    """
+    兼容旧数据，递归删除 chapters[*].sections[*].current_state 字段
+    """
+    chapters = data.get("chapters", [])
+    for chapter in chapters:
+        sections = chapter.get("sections", [])
+        for section in sections:
+            if "after_state" in section:
+                section.pop("after_state")
+    return data

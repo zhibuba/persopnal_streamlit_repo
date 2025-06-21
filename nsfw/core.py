@@ -281,6 +281,7 @@ You are writing the full content for a single section of the novel. You must upd
 - If the section is a buildup, transition, or conflict, focus on emotional, psychological, and relationship development. Keep erotic content and character state changes moderate and gradual.
 - If the section is a climax or major turning point, you may intensify erotic content and allow more significant state changes.
 - Always ensure the pacing of erotic content and character state progression matches the narrative needs of the current section and the overall story arc.
+- Follow the previous section's content to maintain writing continuity, but never repeat the previous section's content.
 
 **Content Formatting Requirements:**
 - Write the full content for the current section only (do not include section or chapter titles)
@@ -323,7 +324,7 @@ Return your answer in the following JSON format:
 ## All Section Summaries in Current Chapter
 {all_section_summaries}
 
-## Current Character States (for incremental update)
+## Current Character States
 {prev_after_state}
 
 ## User Writing Requirements
